@@ -30,6 +30,9 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
 
+  final int _listingFee = 5; 
+  final int _maxActiveListings = 3;
+
   @override
   Widget build(BuildContext context) {
     final diaryList = ref.watch(diaryListProvider);
@@ -330,14 +333,29 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     );
   }
 
-  void _handleSellButtonTap(
-    BuildContext context,
-    WidgetRef ref,
-    DiaryEntry entry,
-  ) async {
+  void _handleSellButtonTap(BuildContext context, WidgetRef ref, DiaryEntry entry) async {
     if (entry.isSold) {
       _showEditOptions(context, ref, entry);
     } else {
+      // ✨ [규제 1] 판매 개수 제한 체크
+      final myActiveItems = ref.read(shopProvider).where((item) => item.ownerName == ref.read(userProvider).username).length;
+      if (myActiveItems >= _maxActiveListings) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Limit Reached! You can only sell $_maxActiveListings items at a time.")),
+        );
+        return;
+      }
+
+      // ✨ [규제 2] 수수료 확인
+      final myCoins = ref.read(userProvider).coins;
+      if (myCoins < _listingFee) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Not enough coins! Listing fee is $_listingFee coins.")),
+        );
+        return;
+      }
+
+      // 통과 시 가격 입력 창 띄우기
       int? price = await _showPriceInputDialog(context);
       if (!context.mounted) return;
       if (price != null) {
@@ -362,6 +380,9 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 // 유료/무료 탭
+                Text("Listing Fee: $_listingFee coins", style: const TextStyle(color: Colors.deepPurple, fontSize: 12, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+
                 Row(
                   children: [
                     Expanded(
@@ -518,6 +539,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     DiaryEntry entry,
     int price,
   ) {
+    ref.read(userProvider.notifier).earnCoins(-_listingFee);
     ref.read(diaryListProvider.notifier).toggleSell(entry.id);
     final newItem = ShopItem(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
