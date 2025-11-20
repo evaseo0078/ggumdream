@@ -1,14 +1,11 @@
-// lib/features/diary/presentation/diary_shop_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/application/user_provider.dart';
 import '../application/shop_provider.dart';
 import '../../../home/home_shell.dart';
-import 'shop_detail_screen.dart';
-import '../../shop/domain/shop_item.dart';
+import 'shop_detail_screen.dart'; 
+import '../../shop/domain/shop_item.dart'; 
 
-// ⚡ 탭 전환 상태 관리를 위해 Stateful로 변경
 class DiaryShopScreen extends ConsumerStatefulWidget {
   const DiaryShopScreen({super.key});
 
@@ -17,7 +14,6 @@ class DiaryShopScreen extends ConsumerStatefulWidget {
 }
 
 class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
-  // false: Market(남의 것), true: My Sales(내 것)
   bool _showMySales = false;
 
   @override
@@ -25,16 +21,9 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
     final userState = ref.watch(userProvider);
     final shopItems = ref.watch(shopProvider);
 
-    // ⚡ 필터링 로직
-    // 1. Market: 주인이 내가 아닌 것들
-    // 2. My Sales: 주인이 나인 것들
     final filteredItems = _showMySales
-        ? shopItems
-              .where((item) => item.ownerName == userState.username)
-              .toList()
-        : shopItems
-              .where((item) => item.ownerName != userState.username)
-              .toList();
+        ? shopItems.where((item) => item.ownerName == userState.username).toList()
+        : shopItems.where((item) => item.ownerName != userState.username).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -47,17 +36,11 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
               alignment: Alignment.center,
               decoration: const BoxDecoration(
                 color: Color(0xFFAABCC5),
-                borderRadius: BorderRadius.vertical(
-                  bottom: Radius.circular(20),
-                ),
+                borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
               ),
               child: const Text(
                 "GGUM store",
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Stencil',
-                ),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, fontFamily: 'Stencil'),
               ),
             ),
 
@@ -67,7 +50,6 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // ⚡ 탭 전환 버튼 (Market vs My Sales)
                   Row(
                     children: [
                       _buildTabButton("Market", !_showMySales),
@@ -75,8 +57,6 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                       _buildTabButton("My Sales", _showMySales),
                     ],
                   ),
-
-                  // 내 코인 정보
                   Row(
                     children: [
                       const CircleAvatar(
@@ -86,18 +66,12 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                       ),
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         color: Colors.grey[300],
-                        child: Text(
-                          "${userState.coins}",
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
+                        child: Text("${userState.coins}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                      )
                     ],
-                  ),
+                  )
                 ],
               ),
             ),
@@ -107,9 +81,9 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
               child: filteredItems.isEmpty
                   ? Center(
                       child: Text(
-                        _showMySales
-                            ? "You are not selling any dreams."
-                            : "No items in the market.",
+                        _showMySales 
+                          ? "You are not selling any dreams." 
+                          : "No items in the market.",
                         style: const TextStyle(color: Colors.grey),
                       ),
                     )
@@ -117,11 +91,7 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       itemCount: filteredItems.length,
                       itemBuilder: (context, index) {
-                        return _buildShopItem(
-                          context,
-                          ref,
-                          filteredItems[index],
-                        );
+                        return _buildShopItem(context, ref, filteredItems[index]);
                       },
                     ),
             ),
@@ -131,12 +101,10 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
     );
   }
 
-  // 탭 버튼 위젯
   Widget _buildTabButton(String text, bool isActive) {
     return GestureDetector(
       onTap: () {
         setState(() {
-          // 텍스트에 따라 모드 변경
           _showMySales = (text == "My Sales");
         });
       },
@@ -159,15 +127,27 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
   }
 
   Widget _buildShopItem(BuildContext context, WidgetRef ref, ShopItem item) {
-    // 내가 파는 물건인지 확인
-    final isMine = _showMySales;
+    final isMine = _showMySales; 
 
     return GestureDetector(
+      // ⚡ [핵심 수정] 탭(Click) 이벤트 제어
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => ShopDetailScreen(item: item)),
-        );
+        if (isMine) {
+          // 1. 내 물건이면 -> 상세 페이지 이동 (자유롭게 열람)
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => ShopDetailScreen(item: item)),
+          );
+        } else if (item.isSold) {
+          // 2. 이미 구매한 물건이면 -> 상세 페이지 이동
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => ShopDetailScreen(item: item)),
+          );
+        } else {
+          // 3. ✨ 안 샀으면 -> "구매하세요" 알림 팝업
+          _showLockedAlert(context, ref, item);
+        }
       },
       child: Column(
         children: [
@@ -184,34 +164,20 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      item.date,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      "Owner: ${item.ownerName}",
-                      style: const TextStyle(fontSize: 10, color: Colors.grey),
-                    ),
+                    Text(item.date, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    Text("Owner: ${item.ownerName}", style: const TextStyle(fontSize: 10, color: Colors.grey)),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     Container(
-                      width: 80,
-                      height: 80,
+                      width: 80, height: 80,
                       color: Colors.grey[300],
                       child: item.imageUrl != null
+                          // 구매 전에는 블러 처리하거나 아이콘만 보여줄 수도 있음 (현재는 아이콘/이미지 유지)
                           ? Image.network(item.imageUrl!, fit: BoxFit.cover)
-                          : Icon(
-                              Icons.image,
-                              color: item.isSold
-                                  ? Colors.grey[400]
-                                  : Colors.grey,
-                            ),
+                          : Icon(Icons.image, color: item.isSold ? Colors.grey[400] : Colors.grey),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -221,14 +187,13 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                           Container(
                             alignment: Alignment.centerLeft,
                             height: 40,
+                            // 구매 전에는 내용이 궁금하게 Summary만 보여줌
                             child: Text(
-                              item.summary ?? item.content,
+                              item.summary ?? "Secret Content 🔒", 
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                decoration: item.isSold
-                                    ? TextDecoration.lineThrough
-                                    : null,
+                                decoration: item.isSold ? TextDecoration.lineThrough : null,
                                 color: item.isSold ? Colors.grey : Colors.black,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -238,80 +203,82 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              Text(
-                                "${item.price} coins ",
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.deepPurple,
-                                ),
-                              ),
+                              Text("${item.price} coins ", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.deepPurple)),
                               const SizedBox(width: 8),
-
-                              // ⚡ 버튼 로직 분기
+                              
                               if (isMine) ...[
-                                // 내 물건일 때: "Selling" (클릭 불가 또는 관리 기능)
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 6,
-                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                                   decoration: BoxDecoration(
                                     color: Colors.orangeAccent,
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
                                     item.isSold ? "Sold" : "My Item",
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                    style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
                                   ),
-                                ),
+                                )
                               ] else ...[
-                                // 남의 물건일 때: "Buy" 버튼
                                 InkWell(
-                                  onTap: item.isSold
-                                      ? null
-                                      : () {
-                                          _confirmPurchase(context, ref, item);
-                                        },
+                                  onTap: item.isSold 
+                                    ? null 
+                                    : () {
+                                        _confirmPurchase(context, ref, item);
+                                      },
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 6,
-                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                                     decoration: BoxDecoration(
-                                      color: item.isSold
-                                          ? Colors.grey
-                                          : const Color(0xFFAABCC5),
+                                      color: item.isSold ? Colors.grey : const Color(0xFFAABCC5),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
                                       item.isSold ? "Sold Out" : "Buy",
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: item.isSold
-                                            ? Colors.white
-                                            : Colors.black54,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      style: TextStyle(fontSize: 12, color: item.isSold ? Colors.white : Colors.black54, fontWeight: FontWeight.bold),
                                     ),
                                   ),
                                 ),
-                              ],
+                              ]
                             ],
-                          ),
+                          )
                         ],
                       ),
-                    ),
+                    )
                   ],
-                ),
+                )
               ],
             ),
           ),
           const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  // ⚡ [추가됨] 잠김 알림 다이얼로그
+  void _showLockedAlert(BuildContext context, WidgetRef ref, ShopItem item) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.lock, color: Colors.grey),
+            SizedBox(width: 10),
+            Text("Locked Content"),
+          ],
+        ),
+        content: const Text("You need to buy this dream to view the full details."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext); // 닫고
+              _confirmPurchase(context, ref, item); // 바로 구매창 띄우기
+            },
+            child: const Text("Buy Now"),
+          ),
         ],
       ),
     );
@@ -323,30 +290,19 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
       builder: (dialogContext) {
         return AlertDialog(
           title: const Text("Confirm Purchase"),
-          content: Text(
-            "Do you really want to buy this dream for ${item.price} coins?",
-          ),
+          content: Text("Do you really want to buy this dream for ${item.price} coins?"),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text("No"),
-            ),
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("No")),
             TextButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
-                final success = ref
-                    .read(userProvider.notifier)
-                    .purchaseItem(item);
+                final success = ref.read(userProvider.notifier).purchaseItem(item);
                 if (success) {
                   ref.read(shopProvider.notifier).markAsSold(item.id);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Purchase Successful!")),
-                  );
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Purchase Successful!")));
                   ref.read(homeTabProvider.notifier).state = 2; // 프로필 이동
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Not enough coins!")),
-                  );
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Not enough coins!")));
                 }
               },
               child: const Text("Yes"),
