@@ -9,7 +9,7 @@ import 'diary_editor_screen.dart';
 import 'diary_detail_screen.dart';
 import '../application/diary_providers.dart';
 import '../application/shop_provider.dart';
-import '../../auth/application/user_provider.dart';
+import '../application/user_provider.dart';
 import '../../shop/domain/shop_item.dart';
 import '../domain/diary_entry.dart';
 import '../../music/application/music_provider.dart';

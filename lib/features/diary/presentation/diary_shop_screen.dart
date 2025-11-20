@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../auth/application/user_provider.dart';
+import '../application/user_provider.dart';
 import '../application/shop_provider.dart';
 import '../../../home/home_shell.dart';
 import 'shop_detail_screen.dart';

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/diary/presentation/diary_list_screen.dart';
 import '../features/diary/presentation/diary_shop_screen.dart';
-import '../features/auth/presentation/account_screen.dart';
+import '../features/login/account_screen.dart';
 
 // ⚡ 탭 위치를 제어하는 리모컨 (전역 Provider)
 // 0: Shop, 1: Home, 2: Settings(Profile)

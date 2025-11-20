@@ -3,9 +3,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/shop_provider.dart';
-import '../../auth/application/user_provider.dart';
 import '../../shop/domain/shop_item.dart';
 import '../../../home/home_shell.dart'; // 탭 이동용
+import '../application/user_provider.dart';
+
 
 class ShopDetailScreen extends ConsumerWidget {
   final ShopItem item;

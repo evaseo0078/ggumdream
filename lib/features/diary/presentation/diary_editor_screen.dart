@@ -4,7 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/widgets/ggum_button.dart';
 import '../application/diary_providers.dart';
-import '../../auth/application/user_provider.dart'; 
+import '../application/user_provider.dart';
 import '../domain/diary_entry.dart';
 import 'diary_detail_screen.dart'; 
 
