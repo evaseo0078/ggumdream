@@ -1,18 +1,20 @@
-// lib/features/diary/presentation/diary_editor_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/widgets/ggum_button.dart';
 import '../application/diary_providers.dart';
+import '../../auth/application/user_provider.dart'; 
 import '../domain/diary_entry.dart';
-import 'diary_detail_screen.dart';
+import 'diary_detail_screen.dart'; 
 
 class DiaryEditorScreen extends ConsumerStatefulWidget {
   final DateTime selectedDate;
 
-  const DiaryEditorScreen({super.key, required this.selectedDate});
+  const DiaryEditorScreen({
+    super.key, 
+    required this.selectedDate,
+  });
 
   @override
   ConsumerState<DiaryEditorScreen> createState() => _DiaryEditorScreenState();
@@ -20,11 +22,9 @@ class DiaryEditorScreen extends ConsumerStatefulWidget {
 
 class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
   final _textController = TextEditingController();
-  double _sleepDuration = 7.0; // 기본값 7시간
-
-  // ⚡ [추가됨] 수면 시간 모름 여부 체크
-  bool _isSleepUnknown = false;
-
+  double _sleepDuration = 7.0; 
+  bool _isSleepUnknown = false; 
+  
   @override
   void dispose() {
     _textController.dispose();
@@ -32,8 +32,25 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
   }
 
   Future<void> _processAndSave() async {
-    if (_textController.text.isEmpty) return;
+    final text = _textController.text.trim(); // 공백 제거한 텍스트
 
+    // 1. 빈 값 체크
+    if (text.isEmpty) return;
+
+    // 2. ✨ [추가됨] 최소 글자수 체크 (예: 20자)
+    const int minLength = 20;
+    if (text.length < minLength) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Too short! Please write at least $minLength characters for better AI analysis."),
+          backgroundColor: Colors.redAccent, // 경고 느낌의 빨간색
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return; // 함수 종료 (저장 진행 X)
+    }
+
+    // 3. 로딩 시작
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -43,14 +60,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
           children: [
             CircularProgressIndicator(color: Color(0xFFAABCC5)),
             SizedBox(height: 20),
-            Text(
-              "Analyzing Dream & Sleep...",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                decoration: TextDecoration.none,
-              ),
-            ),
+            Text("Analyzing Dream & Sleep...", style: TextStyle(color: Colors.white, fontSize: 16, decoration: TextDecoration.none)),
           ],
         ),
       ),
@@ -60,42 +70,48 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
       final llmService = ref.read(llmServiceProvider);
 
       final results = await Future.wait([
-        llmService.generateImage(_textController.text),
-        llmService.analyzeDream(_textController.text),
+        llmService.generateImage(text),
+        llmService.analyzeDream(text),
       ]);
 
       final imageUrl = results[0] as String;
       final analysis = results[1] as Map<String, String>;
 
-      // ⚡ [로직 수정] 모름(Unknown) 상태면 -1.0으로 저장
       final finalSleepDuration = _isSleepUnknown ? -1.0 : _sleepDuration;
 
       final newEntry = DiaryEntry(
         id: const Uuid().v4(),
-        date: widget.selectedDate,
-        content: _textController.text,
+        date: widget.selectedDate, 
+        content: text,
         imageUrl: imageUrl,
         summary: analysis['summary'],
         interpretation: analysis['interpretation'],
         mood: analysis['mood'] ?? "🌿",
-        sleepDuration: finalSleepDuration,
+        sleepDuration: finalSleepDuration, 
       );
 
       ref.read(diaryListProvider.notifier).addDiary(newEntry);
+      ref.read(userProvider.notifier).earnCoins(10); // 10코인 보상
 
       if (!mounted) return;
-      Navigator.pop(context);
+      Navigator.pop(context); 
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Diary Posted! You earned 10 coins! 💰")),
+      );
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => DiaryDetailScreen(entryId: newEntry.id),
         ),
       );
+
     } catch (e) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Failed to analyze.")));
+      Navigator.pop(context); 
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to analyze.")),
+      );
     }
   }
 
@@ -108,12 +124,8 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
       appBar: AppBar(
         leading: const BackButton(color: Colors.black),
         title: Text(
-          dateStr,
-          style: const TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Stencil',
-          ),
+          dateStr, 
+          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontFamily: 'Stencil')
         ),
       ),
       body: Padding(
@@ -121,14 +133,9 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. 수면 시간 입력 섹션
-            const Text(
-              "How long did you sleep?",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
+            const Text("How long did you sleep?", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-
-            // 컨테이너 시작
+            
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -137,7 +144,6 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
               ),
               child: Column(
                 children: [
-                  // ⚡ 탭 버튼 (Input / Unknown)
                   Row(
                     children: [
                       Expanded(
@@ -146,52 +152,36 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             decoration: BoxDecoration(
-                              color: !_isSleepUnknown
-                                  ? const Color(0xFFAABCC5)
-                                  : Colors.transparent,
-                              borderRadius: const BorderRadius.only(
-                                topLeft: Radius.circular(11),
-                              ),
+                              color: !_isSleepUnknown ? const Color(0xFFAABCC5) : Colors.transparent,
+                              borderRadius: const BorderRadius.only(topLeft: Radius.circular(11)),
                             ),
                             alignment: Alignment.center,
                             child: Text(
                               "Input Time",
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: !_isSleepUnknown
-                                    ? Colors.black
-                                    : Colors.grey,
+                                color: !_isSleepUnknown ? Colors.black : Colors.grey,
                               ),
                             ),
                           ),
                         ),
                       ),
-                      Container(
-                        width: 1,
-                        height: 40,
-                        color: Colors.black12,
-                      ), // 구분선
+                      Container(width: 1, height: 40, color: Colors.black12),
                       Expanded(
                         child: InkWell(
                           onTap: () => setState(() => _isSleepUnknown = true),
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             decoration: BoxDecoration(
-                              color: _isSleepUnknown
-                                  ? const Color(0xFFAABCC5)
-                                  : Colors.transparent,
-                              borderRadius: const BorderRadius.only(
-                                topRight: Radius.circular(11),
-                              ),
+                              color: _isSleepUnknown ? const Color(0xFFAABCC5) : Colors.transparent,
+                              borderRadius: const BorderRadius.only(topRight: Radius.circular(11)),
                             ),
                             alignment: Alignment.center,
                             child: Text(
                               "Don't Know",
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: _isSleepUnknown
-                                    ? Colors.black
-                                    : Colors.grey,
+                                color: _isSleepUnknown ? Colors.black : Colors.grey,
                               ),
                             ),
                           ),
@@ -199,10 +189,9 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                       ),
                     ],
                   ),
-
+                  
                   const Divider(height: 1, thickness: 1),
 
-                  // ⚡ 탭 상태에 따른 내용 변경
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: _isSleepUnknown
@@ -210,29 +199,18 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                             padding: EdgeInsets.symmetric(vertical: 10),
                             child: Text(
                               "Sleep duration will not be recorded.",
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontStyle: FontStyle.italic,
-                              ),
+                              style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
                             ),
                           )
                         : Column(
                             children: [
                               Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Icon(
-                                    Icons.bedtime,
-                                    color: Colors.deepPurple,
-                                  ),
+                                  const Icon(Icons.bedtime, color: Colors.deepPurple),
                                   Text(
-                                    "${_sleepDuration.toStringAsFixed(1)} Hours",
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.deepPurple,
-                                    ),
+                                    "${_sleepDuration.toStringAsFixed(1)} Hours", 
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.deepPurple),
                                   ),
                                 ],
                               ),
@@ -240,7 +218,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                                 value: _sleepDuration,
                                 min: 0,
                                 max: 12,
-                                divisions: 24,
+                                divisions: 24, 
                                 activeColor: const Color(0xFFAABCC5),
                                 inactiveColor: Colors.grey[300],
                                 onChanged: (value) {
@@ -255,14 +233,11 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                 ],
               ),
             ),
-
+            
             const SizedBox(height: 30),
 
-            // 2. 꿈 내용 입력
-            const Text(
-              "Write your dream",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            // ✨ 힌트 텍스트에 최소 글자수 표시
+            const Text("Write your dream (min 20 chars)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             Expanded(
               child: Container(
@@ -274,7 +249,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                 padding: const EdgeInsets.all(16),
                 child: TextField(
                   controller: _textController,
-                  maxLines: null,
+                  maxLines: null, 
                   expands: true,
                   style: const TextStyle(fontSize: 16, height: 1.5),
                   decoration: const InputDecoration(

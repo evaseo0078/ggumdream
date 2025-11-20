@@ -1,95 +1,133 @@
-// lib/features/auth/presentation/diary_shop_screen.dart
+// lib/features/auth/presentation/account_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../auth/application/user_provider.dart';
-import '../application/shop_provider.dart';
-import '../../shop/domain/shop_item.dart';
-import '../../../home/home_shell.dart';
+import '../application/user_provider.dart';
 import '../../diary/presentation/shop_detail_screen.dart';
+import '../../shop/domain/shop_item.dart'; // ShopItem 위치 확인
+import '../../diary/presentation/stats_screen.dart';
 
-class DiaryShopScreen extends ConsumerWidget {
-  const DiaryShopScreen({super.key});
+class AccountScreen extends ConsumerWidget {
+  const AccountScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userState = ref.watch(userProvider);
-    final shopItems = ref.watch(shopProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      body: SafeArea(
+      appBar: AppBar(
+        title: const Text("Account Page", style: TextStyle(color: Colors.black26, fontSize: 16)),
+        centerTitle: false,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
+            // 1. 유저네임
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                color: Color(0xFFAABCC5),
-                borderRadius: BorderRadius.vertical(
-                  bottom: Radius.circular(20),
-                ),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.black87),
+                borderRadius: BorderRadius.circular(20),
               ),
-              child: const Text(
-                "GGUM store",
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Stencil',
-                ),
+              child: Text(
+                userState.username,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFAABCC5),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      "Market",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  Row(
+            const SizedBox(height: 24),
+
+            // 2. 프로필 정보
+            Row(
+              children: [
+                const CircleAvatar(
+                  radius: 60,
+                  backgroundColor: Color(0xFFAABCC5),
+                  child: Icon(Icons.person_outline, size: 50, color: Colors.black),
+                ),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const CircleAvatar(
-                        radius: 14,
-                        backgroundColor: Colors.deepPurple,
-                        child: Icon(Icons.star, color: Colors.white, size: 16),
+                      Row(
+                        children: [
+                          const SizedBox(width: 40, child: Text("Coins", style: TextStyle(fontSize: 12))),
+                          Expanded(child: Container(height: 24, color: Colors.grey[300], padding: const EdgeInsets.only(left:8), child: Text("${userState.coins}", style: const TextStyle(fontWeight: FontWeight.bold))))
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        color: Colors.grey[300],
-                        child: Text(
-                          "${userState.coins}",
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const SizedBox(width: 40, child: Text("ID", style: TextStyle(fontSize: 12))),
+                          Expanded(child: Container(height: 24, color: Colors.grey[300], padding: const EdgeInsets.only(left:8), child: Text(userState.userId)))
+                        ],
                       ),
+                      const SizedBox(height: 12),
+                      Align(alignment: Alignment.centerRight, child: SizedBox(height: 30, child: ElevatedButton(onPressed: () {}, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFAABCC5), elevation: 0), child: const Text("Edit Profile", style: TextStyle(color: Colors.black54, fontSize: 12))))),
                     ],
                   ),
-                ],
+                )
+              ],
+            ),
+            
+            const SizedBox(height: 24),
+
+            // ✨ [추가됨] 통계 분석 버튼 (Purchase History 바로 위에 배치 추천)
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const StatsScreen()),
+                  );
+                },
+                icon: const Icon(Icons.bar_chart, color: Colors.white),
+                label: const Text("Analyze Sleep & Dreams", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple[300],
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
               ),
             ),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: shopItems.length,
-                itemBuilder: (context, index) {
-                  return _buildShopItem(context, ref, shopItems[index]);
-                },
-              ),
+            
+            const SizedBox(height: 40),
+
+            // 3. Purchase History
+            const Align(alignment: Alignment.centerLeft, child: Text("Purchase History", style: TextStyle(fontSize: 12))),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.black12)),
+              child: userState.purchaseHistory.isEmpty
+                ? const Text("No items purchased.", style: TextStyle(color: Colors.grey))
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: userState.purchaseHistory.map((item) => _buildHistoryItem(context, item)).toList(),
+                  ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // 4. Sales History
+            const Align(alignment: Alignment.centerLeft, child: Text("Sales History", style: TextStyle(fontSize: 12))),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.black12)),
+              child: userState.salesHistory.isEmpty
+                ? const Text("No sales yet.", style: TextStyle(color: Colors.grey))
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: userState.salesHistory.map((item) => _buildHistoryItem(context, item, isSale: true)).toList(),
+                  ),
             ),
           ],
         ),
@@ -97,7 +135,7 @@ class DiaryShopScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildShopItem(BuildContext context, WidgetRef ref, ShopItem item) {
+  Widget _buildHistoryItem(BuildContext context, ShopItem item, {bool isSale = false}) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -105,161 +143,28 @@ class DiaryShopScreen extends ConsumerWidget {
           MaterialPageRoute(builder: (context) => ShopDetailScreen(item: item)),
         );
       },
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: item.isSold ? Colors.grey[200] : Colors.white,
-              border: Border.all(color: Colors.black12),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      item.date,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      "Owner: ${item.ownerName}",
-                      style: const TextStyle(fontSize: 10, color: Colors.grey),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      color: Colors.grey[300],
-                      child: Icon(
-                        Icons.image,
-                        color: item.isSold ? Colors.grey[400] : Colors.grey,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Container(
-                            alignment: Alignment.centerLeft,
-                            height: 40,
-                            child: Text(
-                              item.content,
-                              maxLines: 2,
-                              style: TextStyle(
-                                decoration: item.isSold
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                                color: item.isSold ? Colors.grey : Colors.black,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Text(
-                                "${item.price} coins ",
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.deepPurple,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              InkWell(
-                                onTap: item.isSold
-                                    ? null
-                                    : () {
-                                        _confirmPurchase(context, ref, item);
-                                      },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: item.isSold
-                                        ? Colors.grey
-                                        : const Color(0xFFAABCC5),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    item.isSold ? "Sold Out" : "Buy",
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: item.isSold
-                                          ? Colors.white
-                                          : Colors.black54,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
-      ),
-    );
-  }
-
-  void _confirmPurchase(BuildContext context, WidgetRef ref, ShopItem item) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text("Confirm Purchase"),
-          content: Text(
-            "Do you really want to buy this dream for ${item.price} coins?",
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text("No"),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                // [수정됨] item 객체 전달
-                final success = ref
-                    .read(userProvider.notifier)
-                    .purchaseItem(item);
-                if (success) {
-                  ref.read(shopProvider.notifier).markAsSold(item.id);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Purchase Successful!")),
-                  );
-                  ref.read(homeTabProvider.notifier).state = 2;
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Not enough coins!")),
-                  );
-                }
-              },
-              child: const Text("Yes"),
-            ),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 10.0),
+        child: Row(
+          children: [
+             Icon(isSale ? Icons.sell : Icons.shopping_bag, size: 16, color: Colors.black54),
+             const SizedBox(width: 8),
+             Expanded(
+               // ⚡ [수정됨] content 대신 summary 표시 (없으면 content)
+               child: Text(
+                 "${item.summary ?? item.content}",
+                 style: const TextStyle(fontSize: 12, decoration: TextDecoration.underline),
+                 maxLines: 1,
+                 overflow: TextOverflow.ellipsis,
+               ),
+             ),
+             Text(
+               "${item.price}c", 
+               style: const TextStyle(fontSize: 10, color: Colors.grey),
+             ),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 }

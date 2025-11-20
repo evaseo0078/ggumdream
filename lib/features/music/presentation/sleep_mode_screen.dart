@@ -19,7 +19,6 @@ class _SleepModeScreenState extends State<SleepModeScreen>
   late AnimationController _animController;
   late Animation<double> _fadeAnimation;
 
-  // 상태 디버깅용 변수
   String _statusMessage = "Loading music...";
   bool _hasError = false;
 
@@ -33,11 +32,9 @@ class _SleepModeScreenState extends State<SleepModeScreen>
   void _setupAnimation() {
     _animController = AnimationController(
       vsync: this,
-      // ⚡ 애니메이션 속도를 조금 더 빠르게 (3초 -> 2초)
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
 
-    // ⚡ 깜빡임 효과를 더 강하게 (0.3 -> 0.1)
     _fadeAnimation = Tween<double>(
       begin: 0.1,
       end: 1.0,
@@ -48,18 +45,14 @@ class _SleepModeScreenState extends State<SleepModeScreen>
     _player = AudioPlayer();
 
     try {
-      // 1. 파일이 실제로 있는지 확인하기 위해 리스트 생성
-      // 파일명이 music1.mp3 ~ music8.mp3 가 맞는지 꼭 확인하세요!
       final playlist = ConcatenatingAudioSource(
         useLazyPreparation: true,
         shuffleOrder: DefaultShuffleOrder(),
         children: List.generate(7, (index) {
-          // ⚡ Asset 경로 설정
           return AudioSource.asset('assets/music/music${index + 1}.mp3');
         }),
       );
 
-      // 2. 로딩 시작
       setState(() => _statusMessage = "Preparing playlist...");
       await _player.setAudioSource(
         playlist,
@@ -70,24 +63,21 @@ class _SleepModeScreenState extends State<SleepModeScreen>
       await _player.setShuffleModeEnabled(true);
       await _player.setLoopMode(LoopMode.all);
 
-      // 3. 재생 시도
       setState(() => _statusMessage = "Playing sleep music...");
       await _player.play();
 
-      // 4. 10분 타이머
       _stopTimer = Timer(const Duration(minutes: 10), () {
         if (mounted) {
           Navigator.pop(context);
         }
       });
     } catch (e) {
-      // ⚡ [중요] 에러 발생 시 화면에 출력
       if (mounted) {
         setState(() {
           _hasError = true;
           _statusMessage = "Error: $e";
         });
-        print("Audio Error Log: $e"); // 콘솔에도 출력
+        print("Audio Error Log: $e");
       }
     }
   }
@@ -120,7 +110,6 @@ class _SleepModeScreenState extends State<SleepModeScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // ⚡ 애니메이션 적용된 텍스트
                   FadeTransition(
                     opacity: _fadeAnimation,
                     child: const Text(
@@ -135,7 +124,6 @@ class _SleepModeScreenState extends State<SleepModeScreen>
                   ),
                   const SizedBox(height: 30),
 
-                  // ⚡ 상태 메시지 (에러 발생 시 빨간색)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Text(
@@ -148,7 +136,6 @@ class _SleepModeScreenState extends State<SleepModeScreen>
                     ),
                   ),
 
-                  // ⚡ 재생이 안될 때 수동 재생 버튼 (브라우저 정책 대응)
                   if (!_player.playing && !_hasError)
                     Padding(
                       padding: const EdgeInsets.only(top: 20),

@@ -348,14 +348,12 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
 
   Future<int?> _showPriceInputDialog(BuildContext context) async {
     final controller = TextEditingController();
-    // 다이얼로그 내부 상태 변수
-    bool isFree = false;
-    String? errorText;
+    bool isFree = false; 
+    String? errorText; 
 
     return showDialog<int>(
       context: context,
       barrierDismissible: false,
-      // StatefulBuilder: 다이얼로그 내부에서 setState를 쓰기 위해 필수!
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(
@@ -363,77 +361,53 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 1. 유료 / 무료 선택 탭
+                // 유료/무료 탭
                 Row(
                   children: [
                     Expanded(
                       child: InkWell(
-                        onTap: () => setState(() {
-                          isFree = false;
-                          errorText = null; // 탭 바꿀 때 에러 초기화
-                        }),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: !isFree
-                                ? const Color(0xFFAABCC5)
-                                : Colors.grey[200],
-                            borderRadius: const BorderRadius.horizontal(
-                              left: Radius.circular(8),
-                            ),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            "Paid",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: !isFree ? Colors.black : Colors.grey,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => setState(() {
-                          isFree = true;
-                          controller.clear(); // 무료면 입력창 비우기
+                        onTap: () => setState(() { 
+                          isFree = false; 
                           errorText = null;
                         }),
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
-                            color: isFree
-                                ? const Color(0xFFAABCC5)
-                                : Colors.grey[200],
-                            borderRadius: const BorderRadius.horizontal(
-                              right: Radius.circular(8),
-                            ),
+                            color: !isFree ? const Color(0xFFAABCC5) : Colors.grey[200],
+                            borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
                           ),
                           alignment: Alignment.center,
-                          child: Text(
-                            "Free",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: isFree ? Colors.black : Colors.grey,
-                            ),
+                          child: Text("Paid", style: TextStyle(fontWeight: FontWeight.bold, color: !isFree ? Colors.black : Colors.grey)),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() { 
+                          isFree = true; 
+                          controller.clear();
+                          errorText = null;
+                        }),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isFree ? const Color(0xFFAABCC5) : Colors.grey[200],
+                            borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
                           ),
+                          alignment: Alignment.center,
+                          child: Text("Free", style: TextStyle(fontWeight: FontWeight.bold, color: isFree ? Colors.black : Colors.grey)),
                         ),
                       ),
                     ),
                   ],
                 ),
-
+                
                 const SizedBox(height: 20),
 
-                // 2. 입력창 (무료일 땐 안내문구 표시)
                 if (isFree)
                   const Text(
                     "This dream will be listed for 0 coins.",
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontStyle: FontStyle.italic,
-                    ),
+                    style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
                   )
                 else
                   TextField(
@@ -441,17 +415,13 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                     keyboardType: TextInputType.number,
                     autofocus: true,
                     decoration: InputDecoration(
-                      hintText: "Enter amount",
+                      hintText: "Enter amount (Max 500)",
                       suffixText: "coins",
-                      errorText: errorText, // 에러 메시지 표시
+                      errorText: errorText,
                       border: const OutlineInputBorder(),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 12,
-                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     ),
                     onChanged: (value) {
-                      // 입력할 때마다 에러 메시지 지워주기
                       if (errorText != null) setState(() => errorText = null);
                     },
                   ),
@@ -464,13 +434,11 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
               ),
               TextButton(
                 onPressed: () {
-                  // 무료인 경우 바로 0 리턴
                   if (isFree) {
                     Navigator.pop(dialogContext, 0);
                     return;
                   }
 
-                  // 유료인 경우 유효성 검사
                   if (controller.text.isEmpty) {
                     setState(() => errorText = "Please enter a price.");
                     return;
@@ -478,13 +446,13 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
 
                   final price = int.tryParse(controller.text);
 
-                  // 정수가 아니거나 0 이하인 경우
                   if (price == null) {
-                    setState(() => errorText = "Numbers only.");
+                     setState(() => errorText = "Numbers only.");
                   } else if (price <= 0) {
-                    setState(() => errorText = "Price must be > 0.");
+                     setState(() => errorText = "Price must be > 0.");
+                  } else if (price > 500) { // ⚡ 500 코인 제한 확인
+                     setState(() => errorText = "Max price is 500 coins.");
                   } else {
-                    // 통과!
                     Navigator.pop(dialogContext, price);
                   }
                 },
