@@ -44,10 +44,6 @@ class MyApp extends StatelessWidget {
       title: 'GGUM DREAM',
       debugShowCheckedModeBanner: false, // 오른쪽 상단 DEBUG 띠 제거
       theme: AppTheme.theme,
-
-      // ✅ 여기가 핵심 변경사항입니다!
-      // LoginPage() 대신 HomeShell()을 바로 실행하여
-      // 로그인 과정을 생략하고 메인 화면으로 진입합니다.
       home: const HomeShell(),
     );
   }

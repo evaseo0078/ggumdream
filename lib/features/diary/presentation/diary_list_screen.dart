@@ -14,6 +14,7 @@ import '../../shop/domain/shop_item.dart';
 import '../domain/diary_entry.dart';
 import '../../music/application/music_provider.dart';
 import '../../music/presentation/sleep_mode_screen.dart';
+import 'package:ggumdream/shared/widgets/wobbly_painter.dart'; // FIX: 패키지 경로로 변경
 
 class DiaryListScreen extends ConsumerStatefulWidget {
   const DiaryListScreen({super.key});
@@ -40,8 +41,8 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     // 2. 리스트 뷰이거나 + 날짜 선택 안했으면 -> 전체 일기
     final displayList = (_isCalendarView && _selectedDay != null)
         ? diaryList
-              .where((entry) => isSameDay(entry.date, _selectedDay))
-              .toList()
+            .where((entry) => isSameDay(entry.date, _selectedDay))
+            .toList()
         : diaryList;
 
     return Scaffold(
@@ -114,13 +115,14 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.6),
                     borderRadius: BorderRadius.circular(16),
+                    border:
+                        Border.all(color: Colors.black12, width: 2), // 두께 2배
                   ),
                   child: TableCalendar(
                     firstDay: DateTime.utc(2020, 1, 1),
                     lastDay: DateTime.utc(2030, 12, 31),
                     focusedDay: _focusedDay,
                     selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-
                     onDaySelected: (selectedDay, focusedDay) {
                       setState(() {
                         if (_selectedDay != null &&
@@ -132,7 +134,6 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                         _focusedDay = focusedDay;
                       });
                     },
-
                     headerStyle: const HeaderStyle(
                       formatButtonVisible: false,
                       titleCentered: true,
@@ -151,13 +152,11 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                         shape: BoxShape.circle,
                       ),
                     ),
-
                     eventLoader: (day) {
                       return diaryList
                           .where((entry) => isSameDay(entry.date, day))
                           .toList();
                     },
-
                     calendarBuilders: CalendarBuilders(
                       markerBuilder: (context, date, events) {
                         if (events.isEmpty) return null;
@@ -210,9 +209,9 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
           ],
         ),
       ),
-
       floatingActionButton: FloatingActionButton(
         backgroundColor: const Color(0xFFAABCC5),
+        shape: const CircleBorder(), // 삐뚤빼뚤한 원을 위해 shape 추가
         child: const Icon(Icons.edit, color: Colors.black87),
         onPressed: () {
           final dateToWrite = _selectedDay ?? DateTime.now();
@@ -249,7 +248,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: Colors.black12),
+          border: Border.all(color: Colors.black12, width: 2), // 두께 2배
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -280,11 +279,16 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                   child: entry.imageUrl != null
                       ? Image.network(entry.imageUrl!, fit: BoxFit.cover)
                       : const Icon(Icons.image, color: Colors.grey),
+                  // 박스 테두리 두께 추가 필요시:
+                  // decoration: BoxDecoration(
+                  //   color: Colors.grey[300],
+                  //   border: Border.all(color: Colors.black26, width: 2),
+                  // ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
                         entry.content,
@@ -298,16 +302,16 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                         child: InkWell(
                           onTap: () =>
                               _handleSellButtonTap(context, ref, entry),
-                          child: Container(
+                          // 판매 버튼 (WobblyContainer 적용)
+                          child: WobblyContainer(
+                            backgroundColor: entry.isSold
+                                ? Colors.orangeAccent
+                                : const Color(0xFFAABCC5),
+                            borderColor: Colors.black12,
+                            borderRadius: 12,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
                               vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: entry.isSold
-                                  ? Colors.orangeAccent
-                                  : const Color(0xFFAABCC5),
-                              borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               entry.isSold ? "Selling" : "Sell",
@@ -330,26 +334,10 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     );
   }
 
-  void _handleSellButtonTap(
-    BuildContext context,
-    WidgetRef ref,
-    DiaryEntry entry,
-  ) async {
-    if (entry.isSold) {
-      _showEditOptions(context, ref, entry);
-    } else {
-      int? price = await _showPriceInputDialog(context);
-      if (!context.mounted) return;
-      if (price != null) {
-        _registerToShop(context, ref, entry, price);
-      }
-    }
-  }
-
   Future<int?> _showPriceInputDialog(BuildContext context) async {
     final controller = TextEditingController();
-    bool isFree = false; 
-    String? errorText; 
+    bool isFree = false;
+    String? errorText;
 
     return showDialog<int>(
       context: context,
@@ -366,48 +354,70 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                   children: [
                     Expanded(
                       child: InkWell(
-                        onTap: () => setState(() { 
-                          isFree = false; 
+                        onTap: () => setState(() {
+                          isFree = false;
                           errorText = null;
                         }),
-                        child: Container(
+                        // 유료 탭 (WobblyContainer 적용)
+                        child: WobblyContainer(
+                          backgroundColor: !isFree
+                              ? const Color(0xFFAABCC5)
+                              : Colors.grey.shade200,
+                          borderColor: Colors.black12,
+                          borderRadius: 8,
                           padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: !isFree ? const Color(0xFFAABCC5) : Colors.grey[200],
-                            borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
+                          child: Align(
+                            alignment: Alignment.center,
+                            child: Text(
+                              "Paid",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: !isFree ? Colors.black : Colors.grey,
+                              ),
+                            ),
                           ),
-                          alignment: Alignment.center,
-                          child: Text("Paid", style: TextStyle(fontWeight: FontWeight.bold, color: !isFree ? Colors.black : Colors.grey)),
                         ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: InkWell(
-                        onTap: () => setState(() { 
-                          isFree = true; 
+                        onTap: () => setState(() {
+                          isFree = true;
                           controller.clear();
                           errorText = null;
                         }),
-                        child: Container(
+                        // 무료 탭 (WobblyContainer 적용)
+                        child: WobblyContainer(
+                          backgroundColor: isFree
+                              ? const Color(0xFFAABCC5)
+                              : Colors.grey.shade200,
+                          borderColor: Colors.black12,
+                          borderRadius: 8,
                           padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isFree ? const Color(0xFFAABCC5) : Colors.grey[200],
-                            borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
+                          child: Align(
+                            alignment: Alignment.center,
+                            child: Text(
+                              "Free",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: isFree ? Colors.black : Colors.grey,
+                              ),
+                            ),
                           ),
-                          alignment: Alignment.center,
-                          child: Text("Free", style: TextStyle(fontWeight: FontWeight.bold, color: isFree ? Colors.black : Colors.grey)),
                         ),
                       ),
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 20),
 
                 if (isFree)
                   const Text(
                     "This dream will be listed for 0 coins.",
-                    style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+                    style: TextStyle(
+                        color: Colors.grey, fontStyle: FontStyle.italic),
                   )
                 else
                   TextField(
@@ -419,7 +429,8 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                       suffixText: "coins",
                       errorText: errorText,
                       border: const OutlineInputBorder(),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 12),
                     ),
                     onChanged: (value) {
                       if (errorText != null) setState(() => errorText = null);
@@ -447,11 +458,12 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                   final price = int.tryParse(controller.text);
 
                   if (price == null) {
-                     setState(() => errorText = "Numbers only.");
+                    setState(() => errorText = "Numbers only.");
                   } else if (price <= 0) {
-                     setState(() => errorText = "Price must be > 0.");
-                  } else if (price > 500) { // ⚡ 500 코인 제한 확인
-                     setState(() => errorText = "Max price is 500 coins.");
+                    setState(() => errorText = "Price must be > 0.");
+                  } else if (price > 500) {
+                    // ⚡ 500 코인 제한 확인
+                    setState(() => errorText = "Max price is 500 coins.");
                   } else {
                     Navigator.pop(dialogContext, price);
                   }
@@ -463,6 +475,22 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
         },
       ),
     );
+  }
+
+  void _handleSellButtonTap(
+    BuildContext context,
+    WidgetRef ref,
+    DiaryEntry entry,
+  ) async {
+    if (entry.isSold) {
+      _showEditOptions(context, ref, entry);
+    } else {
+      int? price = await _showPriceInputDialog(context);
+      if (!context.mounted) return;
+      if (price != null) {
+        _registerToShop(context, ref, entry, price);
+      }
+    }
   }
 
   void _showEditOptions(BuildContext context, WidgetRef ref, DiaryEntry entry) {

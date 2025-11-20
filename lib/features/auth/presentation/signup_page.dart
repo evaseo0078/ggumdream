@@ -1,8 +1,9 @@
-//lib/features/auth/presentation/signup_page.dart
+// lib/features/auth/presentation/signup_page.dart
 
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/notebook_background.dart';
 import '../../../shared/widgets/ggum_button.dart';
+import 'package:ggumdream/shared/widgets/wobbly_painter.dart'; // FIX: 패키지 경로로 변경
 
 class SignupPage extends StatelessWidget {
   const SignupPage({super.key});
@@ -44,17 +45,30 @@ class SignupPage extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _buildLabel("User ID"),
-                  // ID 중복확인 버튼 (디자인 반영)
+                  // ID 중복확인 버튼 (WobblyContainer 적용)
                   SizedBox(
                     height: 30,
                     width: 80,
-                    child: ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFAABCC5),
-                        padding: EdgeInsets.zero,
+                    child: WobblyContainer(
+                      // WobblyContainer 적용
+                      backgroundColor: const Color(0xFFAABCC5),
+                      borderColor: Colors.black87,
+                      borderRadius: 12,
+                      padding: EdgeInsets.zero,
+                      child: ElevatedButton(
+                        onPressed: () {},
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              Colors.transparent, // 배경을 WobblyContainer에 맡김
+                          elevation: 0,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text("OK",
+                            style:
+                                TextStyle(fontSize: 12, color: Colors.black)),
                       ),
-                      child: const Text("OK", style: TextStyle(fontSize: 12)),
                     ),
                   ),
                 ],
@@ -106,13 +120,12 @@ class SignupPage extends StatelessWidget {
     );
   }
 
+  // 삐뚤빼뚤한 입력 필드 (WobblyContainer 적용)
   Widget _buildInput() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.black87),
-      ),
+    return WobblyContainer(
+      backgroundColor: Colors.white,
+      borderColor: Colors.black87,
+      borderRadius: 20,
       child: const TextField(
         decoration: InputDecoration(
           border: InputBorder.none,

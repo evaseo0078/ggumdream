@@ -6,6 +6,7 @@ import '../application/shop_provider.dart';
 import '../../auth/application/user_provider.dart';
 import '../../shop/domain/shop_item.dart';
 import '../../../home/home_shell.dart'; // 탭 이동용
+import 'package:ggumdream/shared/widgets/wobbly_painter.dart'; // FIX: 패키지 경로로 변경
 
 class ShopDetailScreen extends ConsumerWidget {
   final ShopItem item;
@@ -36,22 +37,15 @@ class ShopDetailScreen extends ConsumerWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 140,
-                  height: 140,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(8),
-                    image: item.imageUrl != null
-                        ? DecorationImage(
-                            image: NetworkImage(item.imageUrl!),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
-                  ),
-                  child: item.imageUrl == null
-                      ? const Icon(Icons.image, color: Colors.grey)
-                      : null,
+                // 이미지/플레이스홀더 (WobblyContainer 적용)
+                WobblyContainer(
+                  backgroundColor: Colors.grey.shade300,
+                  borderColor: Colors.black12,
+                  borderRadius: 8,
+                  constraints: BoxConstraints.tight(const Size(140, 140)),
+                  child: item.imageUrl != null
+                      ? Image.network(item.imageUrl!, fit: BoxFit.cover)
+                      : const Icon(Icons.image, color: Colors.grey),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -77,15 +71,14 @@ class ShopDetailScreen extends ConsumerWidget {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              constraints: const BoxConstraints(minHeight: 150),
+            // 꿈 내용 박스 (WobblyContainer 적용)
+            WobblyContainer(
+              backgroundColor: Colors.white,
+              borderColor: Colors.black12,
+              borderRadius: 8,
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: Colors.black12),
-                borderRadius: BorderRadius.circular(8),
-              ),
+              constraints: const BoxConstraints(
+                  minWidth: double.infinity, minHeight: 150),
               child: Text(
                 item.content,
                 style: const TextStyle(fontSize: 14, height: 1.5),
@@ -97,22 +90,29 @@ class ShopDetailScreen extends ConsumerWidget {
                 child: SizedBox(
                   width: 200,
                   height: 50,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      _confirmPurchase(context, ref);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFAABCC5),
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(25),
+                  // 구매 버튼 (WobblyContainer 적용)
+                  child: WobblyContainer(
+                    backgroundColor: const Color(0xFFAABCC5),
+                    borderColor: Colors.black,
+                    borderRadius: 25,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        _confirmPurchase(context, ref);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: Colors.black,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25),
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      "Buy for ${item.price} Coins",
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                      child: Text(
+                        "Buy for ${item.price} Coins",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ),
@@ -135,6 +135,7 @@ class ShopDetailScreen extends ConsumerWidget {
     );
   }
 
+  // Summary / Interpretation 박스 (WobblyContainer 적용)
   Widget _buildResultBox(String label, String content) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -144,14 +145,12 @@ class ShopDetailScreen extends ConsumerWidget {
           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 4),
-        Container(
-          width: double.infinity,
+        WobblyContainer(
+          backgroundColor: Colors.white,
+          borderColor: Colors.black12,
+          borderRadius: 4,
           padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.black12),
-            borderRadius: BorderRadius.circular(4),
-          ),
+          constraints: const BoxConstraints(minWidth: double.infinity),
           child: Text(
             content,
             style: const TextStyle(fontSize: 12),
@@ -181,9 +180,8 @@ class ShopDetailScreen extends ConsumerWidget {
               onPressed: () {
                 Navigator.pop(dialogContext);
                 // [수정됨] item 객체 전달
-                final success = ref
-                    .read(userProvider.notifier)
-                    .purchaseItem(item);
+                final success =
+                    ref.read(userProvider.notifier).purchaseItem(item);
                 if (success) {
                   ref.read(shopProvider.notifier).markAsSold(item.id);
                   ScaffoldMessenger.of(context).showSnackBar(

@@ -26,7 +26,6 @@ class HomeShell extends ConsumerWidget {
 
     return Scaffold(
       body: screens[selectedIndex],
-
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           border: Border(top: BorderSide(color: Colors.black12, width: 1)),

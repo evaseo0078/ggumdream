@@ -1,3 +1,5 @@
+# evaseo0078/ggumdream/ggumdream-1cca341e2dc4be70d1678600675545b388a45f53/pubspec.yaml
+
 name: ggumdream
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
@@ -45,10 +47,12 @@ dependencies:
   hive_flutter: ^1.1.0
   path_provider: ^2.0.15
   uuid: ^3.0.7
-  fl_chart: ^1.1.0
+  # fl_chart 버전을 0.68.0으로 고정하여 호환성 문제를 해결합니다.
+  fl_chart: ^0.68.0 
   just_audio: ^0.10.5
   audio_service: ^0.18.18
   cupertino_icons: ^1.0.8
+  hand_drawn_border: ^0.2.0 #한서삐뚤빼뚤
 
 dev_dependencies:
   flutter_test:
@@ -60,6 +64,10 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^4.0.0
+
+# [추가] 패키지 종속성 충돌을 해결하기 위해 vector_math 버전을 명시적으로 재정의합니다.
+dependency_overrides:
+  vector_math: ^2.2.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
