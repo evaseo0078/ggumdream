@@ -21,7 +21,14 @@ Future<void> main() async {
 
   await Hive.initFlutter();
   Hive.registerAdapter(DiaryEntryAdapter());
-  final box = await Hive.openBox<DiaryEntry>('diaries');
+  // Hive 데이터가 깨졌을 때 복구하도록 한 번 더 시도
+  Box<DiaryEntry> box;
+  try {
+    box = await Hive.openBox<DiaryEntry>('diaries');
+  } catch (_) {
+    await Hive.deleteBoxFromDisk('diaries');
+    box = await Hive.openBox<DiaryEntry>('diaries');
+  }
 
   runApp(
     ProviderScope(
