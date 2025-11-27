@@ -91,9 +91,6 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                         _focusedDay = focusedDay;
                       });
                     },
-<<<<<<< Updated upstream
-                    headerStyle: const HeaderStyle(formatButtonVisible: false, titleCentered: true, titleTextStyle: TextStyle(fontFamily: 'Stencil', fontSize: 18)),
-=======
                     onPageChanged: (focusedDay) {
                       setState(() => _focusedDay = focusedDay);
                     },
@@ -182,7 +179,6 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                         child: const Icon(Icons.chevron_right, color: Colors.black87),
                       ),
                     ),
->>>>>>> Stashed changes
                     calendarStyle: const CalendarStyle(
                       todayDecoration: BoxDecoration(color: Color(0xFFAABCC5), shape: BoxShape.circle),
                       selectedDecoration: BoxDecoration(color: Colors.deepPurple, shape: BoxShape.circle),
@@ -312,35 +308,24 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                       Align(
                         alignment: Alignment.centerRight,
                         child: InkWell(
-<<<<<<< Updated upstream
-                          onTap: () => _handleSellButtonTap(context, ref, entry, isSoldOut),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              // ⚡ [UI 변경] 팔렸으면(Grey), 판매중(Orange), 미등록(Blue)
-                              color: isSoldOut 
-                                  ? Colors.grey 
-                                  : (entry.isSold ? Colors.orangeAccent : const Color(0xFFAABCC5)),
-                              borderRadius: BorderRadius.circular(12),
-=======
                             onTap: () =>
                               _handleSellButtonTap(context, ref, entry, isSoldOut),
-                          child: WobblyContainer(
-                            backgroundColor: isSoldOut
-                                ? Colors.grey
-                                : (isListed ? Colors.orangeAccent : const Color(0xFFAABCC5)),
-                            borderColor: Colors.black12,
-                            borderRadius: 12,
+                          child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
                               vertical: 4,
->>>>>>> Stashed changes
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSoldOut
+                                  ? Colors.grey
+                                  : (isListed ? Colors.orangeAccent : const Color(0xFFAABCC5)),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               isSoldOut 
                                 ? "Sold Out" 
                                 : (isListed ? "Selling" : "Sell"),
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white), // 텍스트 흰색으로 통일
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                             ),
                           ),
                         ),
@@ -356,9 +341,6 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     );
   }
 
-<<<<<<< Updated upstream
-  // ⚡ [로직 수정] 판매 버튼 핸들러
-=======
   Widget _buildDraftCard(BuildContext context, WidgetRef ref, DiaryEntry entry) {
     return GestureDetector(
       onTap: () {
@@ -437,7 +419,6 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     );
   }
 
->>>>>>> Stashed changes
   void _handleSellButtonTap(BuildContext context, WidgetRef ref, DiaryEntry entry, bool isSoldOut) async {
     // 1. 이미 팔린(Sold Out) 경우 -> 아무 작업도 안 함 (취소 불가)
     if (isSoldOut) {
