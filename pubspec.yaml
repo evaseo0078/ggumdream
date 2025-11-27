@@ -48,12 +48,16 @@ dependencies:
   path_provider: ^2.0.15
   uuid: ^3.0.7
   # fl_chart 버전을 0.68.0으로 고정하여 호환성 문제를 해결합니다.
-  fl_chart: ^0.68.0 
+  fl_chart: ^0.68.0
   just_audio: ^0.10.5
   audio_service: ^0.18.18
   cupertino_icons: ^1.0.8
   http: ^1.6.0
   # hand_drawn_border: ^0.2.0 # 한서삐뚤빼뚤 (removed - not available on pub.dev)
+  firebase_core: ^2.4.1
+  firebase_auth: ^4.2.5
+  cloud_firestore: ^4.4.5
+  firebase_analytics: ^10.4.1
 
 dev_dependencies:
   flutter_test:

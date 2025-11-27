@@ -1,46 +1,61 @@
-// lib/features/login/auth_provider.dart
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_repository.dart';
 
-// 회원가입한 ID를 임시 저장하는 provider
-final tempSignupIdProvider = StateProvider<String?>((ref) => null);
+class AuthState {
+  final bool isAuthenticated;
+  final String? username; // 이메일 또는 닉네임
+  final String? error;
 
-final authRepositoryProvider = Provider<AuthRepository>(
-  (ref) => AuthRepository(),
-);
+  const AuthState({
+    required this.isAuthenticated,
+    this.username,
+    this.error,
+  });
 
-final currentUserProvider = StateNotifierProvider<CurrentUserNotifier, String?>(
-  (ref) {
-    final repo = ref.watch(authRepositoryProvider);
-    return CurrentUserNotifier(repo);
-  },
-);
+  AuthState copyWith({
+    bool? isAuthenticated,
+    String? username,
+    String? error,
+  }) {
+    return AuthState(
+      isAuthenticated: isAuthenticated ?? this.isAuthenticated,
+      username: username ?? this.username,
+      error: error,
+    );
+  }
 
-class CurrentUserNotifier extends StateNotifier<String?> {
+  factory AuthState.initial() =>
+      const AuthState(isAuthenticated: false, username: null, error: null);
+}
+
+class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _repo;
-  CurrentUserNotifier(this._repo) : super(null) {
-    _init();
-  }
 
-  Future<void> _init() async {
-    state = await _repo.currentUser();
-  }
+  AuthNotifier(this._repo) : super(AuthState.initial());
 
-  Future<bool> signup(String id, String password) async {
-    final ok = await _repo.signup(id, password);
-    if (ok) state = id;
-    return ok;
-  }
-
-  Future<bool> login(String id, String password) async {
-    final ok = await _repo.login(id, password);
-    if (ok) state = id;
-    return ok;
+  Future<bool> login(String email, String password) async {
+    try {
+      state = state.copyWith(error: null);
+      await _repo.signIn(email: email, password: password);
+      state = state.copyWith(isAuthenticated: true, username: email);
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isAuthenticated: false,
+        error: e.toString(),
+      );
+      return false;
+    }
   }
 
   Future<void> logout() async {
-    await _repo.logout();
-    state = null;
+    await _repo.signOut();
+    state = AuthState.initial();
   }
 }
+
+final authStateProvider =
+    StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+  final repo = ref.watch(authRepositoryProvider);
+  return AuthNotifier(repo);
+});

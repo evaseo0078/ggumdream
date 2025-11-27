@@ -4,30 +4,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
-// 앱 테마 및 화면 import
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+
 import 'app/theme.dart';
-import 'home/home_shell.dart'; // 메인 화면 (하단 탭바)
 import 'features/diary/domain/diary_entry.dart';
 import 'features/diary/application/diary_providers.dart';
+import 'app/router.dart'; // ✅ 방금 routerProvider가 있는 파일
 
-void main() async {
-  // 1. Flutter 엔진 초기화
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 2. Hive (로컬 저장소) 초기화
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   await Hive.initFlutter();
-
-  // 3. Adapter 등록 (일기 데이터 모델 인식용)
   Hive.registerAdapter(DiaryEntryAdapter());
-
-  // 4. 저장소 박스 열기
   final box = await Hive.openBox<DiaryEntry>('diaries');
 
-  // 5. 앱 실행 (ProviderScope로 감싸서 상태 관리 활성화)
   runApp(
     ProviderScope(
       overrides: [
-        // 저장소 Provider를 실제 Hive Box로 연결
         diaryBoxProvider.overrideWithValue(box),
       ],
       child: const MyApp(),
@@ -35,16 +33,19 @@ void main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+// ✅ ConsumerWidget으로 바꿔서 routerProvider 쓴다
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(routerProvider); // GoRouter 가져오기
+
+    return MaterialApp.router(
       title: 'GGUM DREAM',
-      debugShowCheckedModeBanner: false, // 오른쪽 상단 DEBUG 띠 제거
+      debugShowCheckedModeBanner: false,
       theme: AppTheme.theme,
-      home: const HomeShell(),
+      routerConfig: router, // ✅ 여기!
     );
   }
 }

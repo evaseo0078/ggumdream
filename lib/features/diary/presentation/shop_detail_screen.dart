@@ -3,10 +3,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/shop_provider.dart';
-import '../../auth/application/user_provider.dart';
+import '../application/user_provider.dart';
 import '../../shop/domain/shop_item.dart';
-import '../../../home/home_shell.dart'; // 탭 이동용
-import 'package:ggumdream/shared/widgets/wobbly_painter.dart'; // FIX: 패키지 경로로 변경
+import '../../../home/home_shell.dart'; // ???�동??
+import 'package:ggumdream/shared/widgets/wobbly_painter.dart'; // FIX: ?�키지 경로�?변�?
 
 class ShopDetailScreen extends ConsumerWidget {
   final ShopItem item;
@@ -37,7 +37,7 @@ class ShopDetailScreen extends ConsumerWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 이미지/플레이스홀더 (WobblyContainer 적용)
+                // ?��?지/?�레?�스?�??(WobblyContainer ?�용)
                 WobblyContainer(
                   backgroundColor: Colors.grey.shade300,
                   borderColor: Colors.black12,
@@ -71,7 +71,7 @@ class ShopDetailScreen extends ConsumerWidget {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 8),
-            // 꿈 내용 박스 (WobblyContainer 적용)
+            // �??�용 박스 (WobblyContainer ?�용)
             WobblyContainer(
               backgroundColor: Colors.white,
               borderColor: Colors.black12,
@@ -90,7 +90,7 @@ class ShopDetailScreen extends ConsumerWidget {
                 child: SizedBox(
                   width: 200,
                   height: 50,
-                  // 구매 버튼 (WobblyContainer 적용)
+                  // 구매 버튼 (WobblyContainer ?�용)
                   child: WobblyContainer(
                     backgroundColor: const Color(0xFFAABCC5),
                     borderColor: Colors.black,
@@ -135,7 +135,7 @@ class ShopDetailScreen extends ConsumerWidget {
     );
   }
 
-  // Summary / Interpretation 박스 (WobblyContainer 적용)
+  // Summary / Interpretation 박스 (WobblyContainer ?�용)
   Widget _buildResultBox(String label, String content) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -179,7 +179,7 @@ class ShopDetailScreen extends ConsumerWidget {
             TextButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
-                // [수정됨] item 객체 전달
+                // [?�정?? item 객체 ?�달
                 final success =
                     ref.read(userProvider.notifier).purchaseItem(item);
                 if (success) {
@@ -187,8 +187,8 @@ class ShopDetailScreen extends ConsumerWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text("Purchase Successful!")),
                   );
-                  Navigator.pop(context); // 상세창 닫기
-                  ref.read(homeTabProvider.notifier).state = 2; // 프로필로 이동
+                  Navigator.pop(context); // ?�세�??�기
+                  ref.read(homeTabProvider.notifier).state = 2; // ?�로?�로 ?�동
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text("Not enough coins!")),

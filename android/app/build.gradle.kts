@@ -1,8 +1,21 @@
+// 파일 위치: android/app/build.gradle.kts
+
 plugins {
     id("com.android.application")
-    id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
+    
+    // ✅ Firebase Google Services 플러그인 (필수)
+    id("com.google.gms.google-services")
+}
+
+dependencies {
+    // 🔥 Firebase BOM (버전 관리) - 이전에 오류가 났던 implementation 함수 형식으로 수정되었습니다.
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+
+    // ✅ Firebase Analytics 및 Auth SDK 추가
+    implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation("com.google.firebase:firebase-auth-ktx")
 }
 
 android {
@@ -20,10 +33,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.example.ggumdream"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -32,8 +42,6 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

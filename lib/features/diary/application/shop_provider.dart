@@ -2,6 +2,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../shop/domain/shop_item.dart';
+import 'user_provider.dart';
 
 class ShopNotifier extends StateNotifier<List<ShopItem>> {
   ShopNotifier() : super([]) {
