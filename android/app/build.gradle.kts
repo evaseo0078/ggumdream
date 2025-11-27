@@ -21,7 +21,8 @@ dependencies {
 android {
     namespace = "com.example.ggumdream"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // Override to match plugins requiring NDK 27
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

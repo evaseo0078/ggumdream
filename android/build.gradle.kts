@@ -22,6 +22,14 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+// Align Java/Kotlin toolchains across all modules to silence Java 8 warnings.
+subprojects {
+    tasks.withType<org.gradle.api.tasks.compile.JavaCompile>().configureEach {
+        // Suppress obsolete source/target warnings emitted by JDK 21+ when plugins compile with Java 8 defaults.
+        options.compilerArgs.add("-Xlint:-options")
+    }
+}
+
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
