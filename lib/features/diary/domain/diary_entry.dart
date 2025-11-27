@@ -16,6 +16,7 @@ class DiaryEntry extends HiveObject {
   final String mood;
   bool isSold; // 판매 여부
   final double sleepDuration;
+  bool isDraft; // 임시저장 여부
 
   DiaryEntry({
     required this.id,
@@ -27,6 +28,7 @@ class DiaryEntry extends HiveObject {
     this.mood = "🌿",
     this.isSold = false,
     this.sleepDuration = 7.0,
+    this.isDraft = false,
   });
 }
 
@@ -37,16 +39,34 @@ class DiaryEntryAdapter extends TypeAdapter<DiaryEntry> {
 
   @override
   DiaryEntry read(BinaryReader reader) {
+    final fields = <dynamic>[];
+    
+    // 사용 가능한 모든 필드 읽기
+    for (int i = 0; i < 9 && reader.availableBytes > 0; i++) {
+      fields.add(reader.read());
+    }
+    
+    // 10번째 필드(isDraft) 읽기 시도
+    bool isDraft = false;
+    if (reader.availableBytes > 0) {
+      try {
+        isDraft = reader.read() ?? false;
+      } catch (e) {
+        isDraft = false;
+      }
+    }
+    
     return DiaryEntry(
-      id: reader.read(),
-      date: DateTime.parse(reader.read()),
-      content: reader.read(),
-      imageUrl: reader.read(),
-      summary: reader.read(),
-      interpretation: reader.read(),
-      isSold: reader.read(),
-      mood: reader.read(),
-      sleepDuration: reader.read(),
+      id: fields[0],
+      date: DateTime.parse(fields[1]),
+      content: fields[2],
+      imageUrl: fields[3],
+      summary: fields[4],
+      interpretation: fields[5],
+      isSold: fields[6],
+      mood: fields[7],
+      sleepDuration: fields[8],
+      isDraft: isDraft,
     );
   }
 
@@ -61,5 +81,6 @@ class DiaryEntryAdapter extends TypeAdapter<DiaryEntry> {
     writer.write(obj.isSold);
     writer.write(obj.mood);
     writer.write(obj.sleepDuration);
+    writer.write(obj.isDraft);
   }
 }

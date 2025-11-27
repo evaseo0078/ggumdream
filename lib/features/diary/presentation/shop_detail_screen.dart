@@ -9,8 +9,9 @@ import '../../../home/home_shell.dart'; // 탭 이동용
 
 class ShopDetailScreen extends ConsumerWidget {
   final ShopItem item;
+  final bool isPurchased;
 
-  const ShopDetailScreen({super.key, required this.item});
+  const ShopDetailScreen({super.key, required this.item, this.isPurchased = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -92,7 +93,7 @@ class ShopDetailScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 30),
-            if (!item.isSold)
+            if (!isPurchased && !item.isSold)
               Center(
                 child: SizedBox(
                   width: 200,
@@ -115,17 +116,6 @@ class ShopDetailScreen extends ConsumerWidget {
                         fontSize: 16,
                       ),
                     ),
-                  ),
-                ),
-              )
-            else
-              const Center(
-                child: Text(
-                  "Sold Out",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey,
                   ),
                 ),
               ),

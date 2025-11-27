@@ -140,7 +140,12 @@ class AccountScreen extends ConsumerWidget {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => ShopDetailScreen(item: item)),
+          MaterialPageRoute(
+            builder: (context) => ShopDetailScreen(
+              item: item,
+              isPurchased: !isSale, // Purchase History면 true, Sales History면 false
+            ),
+          ),
         );
       },
       child: Padding(

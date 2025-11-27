@@ -26,13 +26,12 @@ class StatsScreen extends ConsumerWidget {
     }
     int total = nightmareCount + normalCount;
 
-    // 2. 데이터 가공: 최근 7개 수면 시간
-    final recentEntries = diaryList.length > 7
-        ? diaryList
-              .sublist(0, 7)
-              .reversed
-              .toList() // 최신 7개 (역순 정렬해서 과거->현재)
-        : diaryList.reversed.toList();
+    // 2. 데이터 가공: 최근 7개 수면 시간 (sleepDuration이 -1인 항목 제외)
+    final recentEntries = (diaryList.length > 7
+        ? diaryList.sublist(0, 7).reversed.toList()
+        : diaryList.reversed.toList())
+        .where((entry) => entry.sleepDuration >= 0)
+        .toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -168,14 +167,47 @@ class StatsScreen extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.black12),
                     ),
-                    child: Text(
-                      total > 0 && (nightmareCount / total > 0.3)
-                          ? "⚠️ Warning: You are having frequent nightmares. Consider relaxing before sleep."
-                          : "✅ Good: Your sleep pattern seems stable.",
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          total > 0 && (nightmareCount / total > 0.3)
+                              ? "⚠️ Warning: You are having frequent nightmares. Consider relaxing before sleep."
+                              : "✅ Good: Your sleep pattern seems stable.",
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (recentEntries.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              const Icon(Icons.bedtime, size: 20, color: Colors.deepPurple),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: RichText(
+                                  text: TextSpan(
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      color: Colors.black87,
+                                    ),
+                                    children: [
+                                      const TextSpan(text: "Average sleep duration (last "),
+                                      TextSpan(text: "${recentEntries.length}"),
+                                      const TextSpan(text: " days): "),
+                                      TextSpan(
+                                        text: "${(recentEntries.map((e) => e.sleepDuration).reduce((a, b) => a + b) / recentEntries.length).toStringAsFixed(1)} hours",
+                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ],

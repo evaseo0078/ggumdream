@@ -77,8 +77,8 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                   margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   decoration: BoxDecoration(color: Colors.white.withOpacity(0.6), borderRadius: BorderRadius.circular(16)),
                   child: TableCalendar(
-                    firstDay: DateTime.utc(2020, 1, 1),
-                    lastDay: DateTime.utc(2030, 12, 31),
+                    firstDay: DateTime.utc(2023, 1, 1),
+                    lastDay: DateTime.utc(2025, 12, 31),
                     focusedDay: _focusedDay,
                     selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
                     onDaySelected: (selectedDay, focusedDay) {
@@ -91,7 +91,98 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                         _focusedDay = focusedDay;
                       });
                     },
+<<<<<<< Updated upstream
                     headerStyle: const HeaderStyle(formatButtonVisible: false, titleCentered: true, titleTextStyle: TextStyle(fontFamily: 'Stencil', fontSize: 18)),
+=======
+                    onPageChanged: (focusedDay) {
+                      setState(() => _focusedDay = focusedDay);
+                    },
+
+                    headerStyle: HeaderStyle(
+                      formatButtonVisible: false,
+                      titleCentered: true,
+                      titleTextStyle: const TextStyle(
+                        fontFamily: 'Stencil',
+                        fontSize: 18,
+                      ),
+                      leftChevronIcon: GestureDetector(
+                        onTap: () {
+                          final previousMonth = DateTime(_focusedDay.year, _focusedDay.month - 1);
+                          if (previousMonth.isBefore(DateTime.utc(2023, 1, 1))) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Only diaries from the last 3 years are saved.'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          } else {
+                            setState(() => _focusedDay = previousMonth);
+                          }
+                        },
+                        child: const Icon(Icons.chevron_left, color: Colors.black87),
+                      ),
+                      rightChevronIcon: GestureDetector(
+                        onTap: () {
+                          final nextMonth = DateTime(_focusedDay.year, _focusedDay.month + 1);
+                          if (nextMonth.isAfter(DateTime.utc(2025, 12, 31))) {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.calendar_month,
+                                      size: 80,
+                                      color: Color(0xFFAABCC5),
+                                    ),
+                                    const SizedBox(height: 20),
+                                    const Text(
+                                      '2026',
+                                      style: TextStyle(
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'Stencil',
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    const Text(
+                                      'Coming Soon! ✨',
+                                      style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      'The next version will be\nreleased in 2026.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('OK'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          } else {
+                            setState(() => _focusedDay = nextMonth);
+                          }
+                        },
+                        child: const Icon(Icons.chevron_right, color: Colors.black87),
+                      ),
+                    ),
+>>>>>>> Stashed changes
                     calendarStyle: const CalendarStyle(
                       todayDecoration: BoxDecoration(color: Color(0xFFAABCC5), shape: BoxShape.circle),
                       selectedDecoration: BoxDecoration(color: Colors.deepPurple, shape: BoxShape.circle),
@@ -147,6 +238,11 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
   }
 
   Widget _buildDiaryCard(BuildContext context, WidgetRef ref, DiaryEntry entry) {
+    // 임시저장 여부 확인
+    if (entry.isDraft) {
+      return _buildDraftCard(context, ref, entry);
+    }
+
     // 현재 이 일기가 상점에 등록된 상태인지 확인 (상점 데이터에서 찾기)
     final shopItems = ref.watch(shopProvider);
     
@@ -162,6 +258,8 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
 
     // 판매 완료 여부 확인
     final bool isSoldOut = matchingShopItem != null && matchingShopItem.isSold;
+    // 현재 상점에 등록된 상태인지 확인 (matchingShopItem이 있으면 등록됨)
+    final bool isListed = matchingShopItem != null;
 
     return GestureDetector(
       onTap: () {
@@ -183,7 +281,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
               children: [
                 Text("${DateFormat('yyyy.MM.dd').format(entry.date)}  ${entry.mood}", style: const TextStyle(fontWeight: FontWeight.bold)),
                 InkWell(
-                  onTap: () => ref.read(diaryListProvider.notifier).deleteDiary(entry.id),
+                  onTap: () => _confirmDelete(context, ref, entry.id),
                   child: const Icon(Icons.delete_outline, size: 20),
                 ),
               ],
@@ -204,11 +302,17 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(entry.content, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+                      Text(
+                        entry.summary ?? entry.content, 
+                        maxLines: 3, 
+                        overflow: TextOverflow.ellipsis, 
+                        style: const TextStyle(fontSize: 12)
+                      ),
                       const SizedBox(height: 8),
                       Align(
                         alignment: Alignment.centerRight,
                         child: InkWell(
+<<<<<<< Updated upstream
                           onTap: () => _handleSellButtonTap(context, ref, entry, isSoldOut),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -218,11 +322,24 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                                   ? Colors.grey 
                                   : (entry.isSold ? Colors.orangeAccent : const Color(0xFFAABCC5)),
                               borderRadius: BorderRadius.circular(12),
+=======
+                            onTap: () =>
+                              _handleSellButtonTap(context, ref, entry, isSoldOut),
+                          child: WobblyContainer(
+                            backgroundColor: isSoldOut
+                                ? Colors.grey
+                                : (isListed ? Colors.orangeAccent : const Color(0xFFAABCC5)),
+                            borderColor: Colors.black12,
+                            borderRadius: 12,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+>>>>>>> Stashed changes
                             ),
                             child: Text(
                               isSoldOut 
                                 ? "Sold Out" 
-                                : (entry.isSold ? "Selling" : "Sell"),
+                                : (isListed ? "Selling" : "Sell"),
                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white), // 텍스트 흰색으로 통일
                             ),
                           ),
@@ -239,7 +356,88 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     );
   }
 
+<<<<<<< Updated upstream
   // ⚡ [로직 수정] 판매 버튼 핸들러
+=======
+  Widget _buildDraftCard(BuildContext context, WidgetRef ref, DiaryEntry entry) {
+    return GestureDetector(
+      onTap: () {
+        // 임시저장 일기를 클릭하면 수정 모드로 이동
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DiaryEditorScreen(
+              selectedDate: entry.date,
+              existingEntry: entry,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Colors.orange, width: 2),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      "${DateFormat('yyyy.MM.dd').format(entry.date)}  ${entry.mood}",
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.orange,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        "DRAFT",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                InkWell(
+                  onTap: () => _confirmDelete(context, ref, entry.id),
+                  child: const Icon(Icons.delete_outline, size: 20),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              entry.content.length > 50 
+                ? '${entry.content.substring(0, 50)}...' 
+                : entry.content,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, color: Colors.black87),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              "Tap to complete and analyze",
+              style: TextStyle(fontSize: 11, color: Colors.orange, fontStyle: FontStyle.italic),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+>>>>>>> Stashed changes
   void _handleSellButtonTap(BuildContext context, WidgetRef ref, DiaryEntry entry, bool isSoldOut) async {
     // 1. 이미 팔린(Sold Out) 경우 -> 아무 작업도 안 함 (취소 불가)
     if (isSoldOut) {
@@ -249,7 +447,18 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
       return;
     }
 
-    if (entry.isSold) {
+    // shopProvider에서 현재 아이템 찾기
+    final shopItems = ref.read(shopProvider);
+    ShopItem? matchingShopItem;
+    try {
+      matchingShopItem = shopItems.firstWhere(
+        (item) => item.content == entry.content && item.ownerName == ref.read(userProvider).username,
+      );
+    } catch (e) {
+      matchingShopItem = null;
+    }
+
+    if (matchingShopItem != null) {
       // 2. 판매 중(Selling)인 경우 -> 옵션 팝업 (가격 변경 or 판매 취소)
       _showEditOptions(context, ref, entry);
     } else {
@@ -423,5 +632,33 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     ref.read(shopProvider.notifier).removeItemByContent(entry.content);
     ref.read(userProvider.notifier).cancelSale(entry.content);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Sale Canceled.")));
+  }
+
+  void _confirmDelete(BuildContext context, WidgetRef ref, String entryId) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text("Delete Diary"),
+          content: const Text("Are you sure you want to delete this diary entry?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                ref.read(diaryListProvider.notifier).deleteDiary(entryId);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Diary deleted.")),
+                );
+              },
+              child: const Text("Delete", style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
