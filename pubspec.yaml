@@ -73,6 +73,8 @@ dev_dependencies:
 # [추가] 패키지 종속성 충돌을 해결하기 위해 vector_math 버전을 명시적으로 재정의합니다.
 dependency_overrides:
   vector_math: ^2.2.0
+  firebase_core_web: ^3.3.0
+  firebase_auth_web: ^6.1.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
