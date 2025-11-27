@@ -1,55 +1,65 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import '../domain/diary_entry.dart';
-import '../data/diary_repository.dart';
-import '../../music/application/audio_handler.dart'; 
+import 'dart:async';
 
-final diaryBoxProvider = Provider<Box<DiaryEntry>>((ref) {
-  throw UnimplementedError(); 
-});
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../data/diary_repository.dart';
+import '../domain/diary_entry.dart';
 
 final diaryRepositoryProvider = Provider<DiaryRepository>((ref) {
-  final box = ref.watch(diaryBoxProvider);
-  return DiaryRepository(box);
+  return DiaryRepository();
 });
 
 final llmServiceProvider = Provider<MockLLMService>((ref) => MockLLMService());
 
 class DiaryListNotifier extends StateNotifier<List<DiaryEntry>> {
   final DiaryRepository _repository;
+  StreamSubscription<List<DiaryEntry>>? _subscription;
 
   DiaryListNotifier(this._repository) : super([]) {
-    loadDiaries();
+    _listenToDiaries();
   }
 
-  void loadDiaries() {
-    state = _repository.getDiaries();
+  void _listenToDiaries() {
+    _subscription?.cancel();
+    _subscription = _repository.watchDiaries().listen(
+      (entries) => state = entries,
+      onError: (_) => state = [],
+    );
+  }
+
+  Future<void> refresh() async {
+    try {
+      state = await _repository.fetchDiaries();
+    } catch (_) {
+      state = [];
+    }
   }
 
   Future<void> addDiary(DiaryEntry entry) async {
-    await _repository.addDiary(entry);
-    loadDiaries();
+    await _repository.saveDiary(entry);
   }
 
-  // ⚡ [추가됨] 일기 수정 함수
   Future<void> updateDiary(DiaryEntry entry) async {
-    // Hive는 같은 Key(ID)에 put을 하면 덮어쓰기(수정)가 됩니다.
-    await _repository.addDiary(entry); 
-    loadDiaries();
+    await _repository.saveDiary(entry);
   }
 
   Future<void> deleteDiary(String id) async {
     await _repository.deleteDiary(id);
-    loadDiaries();
   }
-  
-  Future<void> toggleSell(String id) async {
-    await _repository.toggleSellStatus(id);
-    loadDiaries(); 
+
+  Future<void> setSellStatus(String id, bool isSold) async {
+    await _repository.setSellStatus(id, isSold);
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 }
 
-final diaryListProvider = StateNotifierProvider<DiaryListNotifier, List<DiaryEntry>>((ref) {
+final diaryListProvider =
+    StateNotifierProvider<DiaryListNotifier, List<DiaryEntry>>((ref) {
   final repository = ref.watch(diaryRepositoryProvider);
   return DiaryListNotifier(repository);
 });

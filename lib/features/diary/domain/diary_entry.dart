@@ -1,65 +1,91 @@
-//lib/features/diary/domain/diary_entry.dart
+// lib/features/diary/domain/diary_entry.dart
 
-import 'package:hive/hive.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-// g.dart 파일 생성은 build_runner를 돌려야 하므로,
-// 여기서는 수동으로 Adapter를 등록하는 방식으로 간소화해서 짜드리겠습니다.
-// (실제로는 @HiveType(typeId: 0) 등을 사용합니다.)
-
-class DiaryEntry extends HiveObject {
+/// Domain model for a diary entry stored in Firestore.
+class DiaryEntry {
   final String id;
   final DateTime date;
-  String content;
-  String? imageUrl; // LLM이 생성한 이미지 URL (로컬 경로 or 웹 URL)
-  String? summary; // 꿈 요약
-  String? interpretation; // 해몽 결과
+  final String content;
+  final String? imageUrl;
+  final String? summary;
+  final String? interpretation;
   final String mood;
-  bool isSold; // 판매 여부
   final double sleepDuration;
+  final bool isSold;
 
-  DiaryEntry({
+  const DiaryEntry({
     required this.id,
     required this.date,
     required this.content,
     this.imageUrl,
     this.summary,
     this.interpretation,
-    this.mood = "🌿",
-    this.isSold = false,
+    this.mood = '🙂',
     this.sleepDuration = 7.0,
+    this.isSold = false,
   });
-}
 
-// Hive Adapter (main.dart에서 등록 필요)
-class DiaryEntryAdapter extends TypeAdapter<DiaryEntry> {
-  @override
-  final int typeId = 0;
-
-  @override
-  DiaryEntry read(BinaryReader reader) {
+  DiaryEntry copyWith({
+    String? id,
+    DateTime? date,
+    String? content,
+    String? imageUrl,
+    String? summary,
+    String? interpretation,
+    String? mood,
+    double? sleepDuration,
+    bool? isSold,
+  }) {
     return DiaryEntry(
-      id: reader.read(),
-      date: DateTime.parse(reader.read()),
-      content: reader.read(),
-      imageUrl: reader.read(),
-      summary: reader.read(),
-      interpretation: reader.read(),
-      isSold: reader.read(),
-      mood: reader.read(),
-      sleepDuration: reader.read(),
+      id: id ?? this.id,
+      date: date ?? this.date,
+      content: content ?? this.content,
+      imageUrl: imageUrl ?? this.imageUrl,
+      summary: summary ?? this.summary,
+      interpretation: interpretation ?? this.interpretation,
+      mood: mood ?? this.mood,
+      sleepDuration: sleepDuration ?? this.sleepDuration,
+      isSold: isSold ?? this.isSold,
     );
   }
 
-  @override
-  void write(BinaryWriter writer, DiaryEntry obj) {
-    writer.write(obj.id);
-    writer.write(obj.date.toIso8601String());
-    writer.write(obj.content);
-    writer.write(obj.imageUrl);
-    writer.write(obj.summary);
-    writer.write(obj.interpretation);
-    writer.write(obj.isSold);
-    writer.write(obj.mood);
-    writer.write(obj.sleepDuration);
+  Map<String, dynamic> toFirestore() {
+    return {
+      'date': Timestamp.fromDate(date),
+      'content': content,
+      'imageUrl': imageUrl,
+      'summary': summary,
+      'interpretation': interpretation,
+      'mood': mood,
+      'sleepDuration': sleepDuration,
+      'isSold': isSold,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+  }
+
+  factory DiaryEntry.fromFirestore(String id, Map<String, dynamic> data) {
+    final rawDate = data['date'];
+    DateTime parsedDate;
+    if (rawDate is Timestamp) {
+      parsedDate = rawDate.toDate();
+    } else if (rawDate is String) {
+      parsedDate = DateTime.tryParse(rawDate) ?? DateTime.now();
+    } else {
+      parsedDate = DateTime.now();
+    }
+
+    return DiaryEntry(
+      id: id,
+      date: parsedDate,
+      content: data['content'] as String? ?? '',
+      imageUrl: data['imageUrl'] as String?,
+      summary: data['summary'] as String?,
+      interpretation: data['interpretation'] as String?,
+      mood: data['mood'] as String? ?? '🙂',
+      sleepDuration:
+          (data['sleepDuration'] is num) ? (data['sleepDuration'] as num).toDouble() : 7.0,
+      isSold: data['isSold'] as bool? ?? false,
+    );
   }
 }
