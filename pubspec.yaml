@@ -54,10 +54,10 @@ dependencies:
   cupertino_icons: ^1.0.8
   http: ^1.6.0
   # hand_drawn_border: ^0.2.0 # 한서삐뚤빼뚤 (removed - not available on pub.dev)
-  firebase_core: ^2.4.1
-  firebase_auth: ^4.2.5
-  cloud_firestore: ^4.4.5
-  firebase_analytics: ^10.4.1
+  firebase_core: ^4.2.1
+  firebase_auth: ^6.1.2
+  cloud_firestore: ^6.0.0
+  firebase_analytics: ^12.0.4
 
 dev_dependencies:
   flutter_test:

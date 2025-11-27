@@ -1,19 +1,19 @@
-// 파일 위치: android/app/build.gradle.kts
+// ?�일 ?�치: android/app/build.gradle.kts
 
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
     
-    // ✅ Firebase Google Services 플러그인 (필수)
+    // ??Firebase Google Services ?�러그인 (?�수)
     id("com.google.gms.google-services")
 }
 
 dependencies {
-    // 🔥 Firebase BOM (버전 관리) - 이전에 오류가 났던 implementation 함수 형식으로 수정되었습니다.
-    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    // ?�� Firebase BOM (버전 관�? - ?�전???�류가 ?�던 implementation ?�수 ?�식?�로 ?�정?�었?�니??
+    implementation(platform("com.google.firebase:firebase-bom:33.6.0"))
 
-    // ✅ Firebase Analytics 및 Auth SDK 추가
+    // ??Firebase Analytics �?Auth SDK 추�?
     implementation("com.google.firebase:firebase-analytics-ktx")
     implementation("com.google.firebase:firebase-auth-ktx")
 }
