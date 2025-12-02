@@ -83,7 +83,7 @@ class AuthRepository {
     user ??= _auth.currentUser;
     if (user == null) {
       // 여기까지 오면 정말로 뭔가 이상한 상황
-      throw Exception('회원가입은 되었지만 사용자 정보를 가져오지 못했습니다.');
+      throw Exception('Sign-up was successful, but failed to retrieve user information');
     }
 
     final uid = user.uid;

@@ -93,7 +93,7 @@ class AccountScreen extends ConsumerWidget {
                   child: Column(
                     children: [
                       Text(
-                        'Current Coins',
+                        'You have',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -133,7 +133,7 @@ class AccountScreen extends ConsumerWidget {
 
             // Purchase History
             const Text(
-              '구매 내역',
+              'Purchase History',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -149,7 +149,7 @@ class AccountScreen extends ConsumerWidget {
                 border: Border.all(color: Colors.green.shade100),
               ),
               child: myPurchasedItems.isEmpty && userState.purchaseHistory.isEmpty
-                  ? const Text("구매한 일기가 없습니다.", style: TextStyle(color: Colors.grey))
+                  ? const Text("No purchase history.", style: TextStyle(color: Colors.grey))
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -163,7 +163,7 @@ class AccountScreen extends ConsumerWidget {
 
             // Currently Selling
             const Text(
-              '판매 중인 일기',
+              'Currently Selling',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -179,7 +179,7 @@ class AccountScreen extends ConsumerWidget {
                 border: Border.all(color: Colors.orange.shade100),
               ),
               child: mySellingItems.isEmpty
-                  ? const Text("판매 중인 일기가 없습니다.", style: TextStyle(color: Colors.grey))
+                  ? const Text("No items currently selling.", style: TextStyle(color: Colors.grey))
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: mySellingItems.map((item) => _buildSellingItem(context, item)).toList(),
@@ -190,7 +190,7 @@ class AccountScreen extends ConsumerWidget {
 
             // Sold Items
             const Text(
-              '판매 완료',
+              'Sold Items',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -206,7 +206,7 @@ class AccountScreen extends ConsumerWidget {
                 border: Border.all(color: Colors.grey.shade300),
               ),
               child: mySoldItems.isEmpty
-                  ? const Text("판매 완료된 일기가 없습니다.", style: TextStyle(color: Colors.grey))
+                  ? const Text("No sold items.", style: TextStyle(color: Colors.grey))
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: mySoldItems.map((item) => _buildSoldItem(context, item)).toList(),
