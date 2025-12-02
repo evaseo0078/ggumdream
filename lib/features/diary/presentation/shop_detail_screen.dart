@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -46,9 +47,32 @@ class ShopDetailScreen extends ConsumerWidget {
                   borderColor: Colors.black12,
                   borderRadius: 8,
                   constraints: BoxConstraints.tight(const Size(140, 140)),
-                  child: item.imageUrl != null
-                      ? Image.network(item.imageUrl!, fit: BoxFit.cover)
-                      : const Icon(Icons.image, color: Colors.grey),
+                  child: Stack(
+                    children: [
+                      item.imageUrl != null
+                          ? Image.network(item.imageUrl!, fit: BoxFit.cover)
+                          : const Icon(Icons.image, color: Colors.grey),
+                      if (!isPurchased)
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                              child: Container(
+                                color: Colors.black.withOpacity(0.1),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.lock,
+                                    color: Colors.white,
+                                    size: 40,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -56,12 +80,18 @@ class ShopDetailScreen extends ConsumerWidget {
                     children: [
                       _buildResultBox(
                         "Summary",
-                        item.summary ?? "No summary available",
+                        isPurchased 
+                            ? (item.summary ?? "No summary available")
+                            : "🔒 Purchase to view summary",
+                        isBlurred: !isPurchased,
                       ),
                       const SizedBox(height: 10),
                       _buildResultBox(
                         "Interpretation",
-                        item.interpretation ?? "No interpretation available",
+                        isPurchased 
+                            ? (item.interpretation ?? "No interpretation available")
+                            : "🔒 Purchase to view interpretation",
+                        isBlurred: !isPurchased,
                       ),
                     ],
                   ),
@@ -81,9 +111,45 @@ class ShopDetailScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(16),
               constraints:
                   const BoxConstraints(minWidth: double.infinity, minHeight: 150),
-              child: Text(
-                item.content,
-                style: const TextStyle(fontSize: 14, height: 1.5),
+              child: Stack(
+                children: [
+                  Text(
+                    isPurchased ? item.content : item.content,
+                    style: const TextStyle(fontSize: 14, height: 1.5),
+                  ),
+                  if (!isPurchased)
+                    Positioned.fill(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                          child: Container(
+                            color: Colors.black.withOpacity(0.1),
+                            child: const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.lock,
+                                    color: Colors.black54,
+                                    size: 30,
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    "Purchase to read the dream",
+                                    style: TextStyle(
+                                      color: Colors.black54,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             const SizedBox(height: 30),
@@ -125,7 +191,7 @@ class ShopDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildResultBox(String label, String content) {
+  Widget _buildResultBox(String label, String content, {bool isBlurred = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -137,11 +203,34 @@ class ShopDetailScreen extends ConsumerWidget {
           borderRadius: 4,
           padding: const EdgeInsets.all(8),
           constraints: const BoxConstraints(minWidth: double.infinity),
-          child: Text(
-            content,
-            style: const TextStyle(fontSize: 12),
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
+          child: Stack(
+            children: [
+              Text(
+                content,
+                style: const TextStyle(fontSize: 12),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (isBlurred)
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+                      child: Container(
+                        color: Colors.black.withOpacity(0.05),
+                        child: const Center(
+                          child: Icon(
+                            Icons.lock_outline,
+                            color: Colors.black38,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ],
