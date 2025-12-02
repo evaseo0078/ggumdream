@@ -1,41 +1,48 @@
-//lib/features/diary/data/purchase_repository.dart
-
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive/hive.dart';
+
+import '../../shop/domain/shop_item.dart';
 
 final purchaseRepositoryProvider = Provider<PurchaseRepository>(
   (ref) => PurchaseRepository(),
 );
 
 class PurchaseRepository {
-  static const _boxName = 'purchased_diaries';
+  final FirebaseFirestore _firestore;
+  final FirebaseAuth _auth;
 
-  Box<Map> get _box => Hive.box<Map>(_boxName);
+  PurchaseRepository({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? FirebaseAuth.instance;
 
-  // 구매 내역 저장
-  Future<void> addPurchase(Map<String, dynamic> diary) async {
-    final id = diary['id'] as String;
-    await _box.put(id, diary);
+  String _requireUid() {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      throw StateError('No authenticated user.');
+    }
+    return uid;
   }
 
-  // 구매한 일기 목록 가져오기 (최신순)
-  List<Map<String, dynamic>> getPurchasedDiaries() {
-    final list = _box.values
-        .map((e) => Map<String, dynamic>.from(e.cast<String, dynamic>()))
+  CollectionReference<Map<String, dynamic>> _purchases(String uid) {
+    return _firestore.collection('users').doc(uid).collection('purchases');
+  }
+
+  Future<void> recordPurchase(ShopItem item) async {
+    final uid = _requireUid();
+    final purchased = item.copyWith(purchasedAt: DateTime.now());
+    await _purchases(uid).doc(item.id).set(purchased.toFirestore());
+  }
+
+  Future<List<ShopItem>> fetchPurchases() async {
+    final uid = _requireUid();
+    final snapshot =
+        await _purchases(uid).orderBy('purchasedAt', descending: true).get();
+
+    return snapshot.docs
+        .map((doc) => ShopItem.fromFirestore(doc.id, doc.data()))
         .toList();
-
-    // 날짜 기준으로 정렬
-    list.sort((a, b) {
-      final da = DateTime.tryParse(a['date'].toString()) ?? DateTime.now();
-      final db = DateTime.tryParse(b['date'].toString()) ?? DateTime.now();
-      return db.compareTo(da); // 최신순
-    });
-
-    return list;
-  }
-
-  // 특정 일기가 구매되었는지 확인
-  bool isPurchased(String id) {
-    return _box.containsKey(id);
   }
 }

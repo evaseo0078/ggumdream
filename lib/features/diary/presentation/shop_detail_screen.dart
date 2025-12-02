@@ -1,11 +1,13 @@
-// lib/features/diary/presentation/shop_detail_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../application/shop_provider.dart';
-import '../../auth/application/user_provider.dart';
+import 'package:intl/intl.dart';
+
+import '../../../home/home_shell.dart';
 import '../../shop/domain/shop_item.dart';
-import '../../../home/home_shell.dart'; // 탭 이동용
+import '../application/shop_provider.dart';
+import '../application/user_provider.dart';
+import '../data/purchase_repository.dart';
+import 'package:ggumdream/shared/widgets/wobbly_painter.dart';
 
 class ShopDetailScreen extends ConsumerWidget {
   final ShopItem item;
@@ -15,12 +17,14 @@ class ShopDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final dateText = DateFormat('yyyy.MM.dd').format(item.date);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
         leading: const BackButton(color: Colors.black),
         title: Text(
-          "${item.date} (by ${item.ownerName})",
+          "$dateText (by ${item.ownerName})",
           style: const TextStyle(
             color: Colors.black,
             fontSize: 16,
@@ -37,22 +41,14 @@ class ShopDetailScreen extends ConsumerWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 140,
-                  height: 140,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(8),
-                    image: item.imageUrl != null
-                        ? DecorationImage(
-                            image: NetworkImage(item.imageUrl!),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
-                  ),
-                  child: item.imageUrl == null
-                      ? const Icon(Icons.image, color: Colors.grey)
-                      : null,
+                WobblyContainer(
+                  backgroundColor: Colors.grey.shade300,
+                  borderColor: Colors.black12,
+                  borderRadius: 8,
+                  constraints: BoxConstraints.tight(const Size(140, 140)),
+                  child: item.imageUrl != null
+                      ? Image.network(item.imageUrl!, fit: BoxFit.cover)
+                      : const Icon(Icons.image, color: Colors.grey),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -78,15 +74,13 @@ class ShopDetailScreen extends ConsumerWidget {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              constraints: const BoxConstraints(minHeight: 150),
+            WobblyContainer(
+              backgroundColor: Colors.white,
+              borderColor: Colors.black12,
+              borderRadius: 8,
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: Colors.black12),
-                borderRadius: BorderRadius.circular(8),
-              ),
+              constraints:
+                  const BoxConstraints(minWidth: double.infinity, minHeight: 150),
               child: Text(
                 item.content,
                 style: const TextStyle(fontSize: 14, height: 1.5),
@@ -98,22 +92,28 @@ class ShopDetailScreen extends ConsumerWidget {
                 child: SizedBox(
                   width: 200,
                   height: 50,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      _confirmPurchase(context, ref);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFAABCC5),
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(25),
+                  child: WobblyContainer(
+                    backgroundColor: const Color(0xFFAABCC5),
+                    borderColor: Colors.black,
+                    borderRadius: 25,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        _confirmPurchase(context, ref);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: Colors.black,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25),
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      "Buy for ${item.price} Coins",
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                      child: Text(
+                        "Buy for ${item.price} Coins",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ),
@@ -129,19 +129,14 @@ class ShopDetailScreen extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-        ),
+        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        Container(
-          width: double.infinity,
+        WobblyContainer(
+          backgroundColor: Colors.white,
+          borderColor: Colors.black12,
+          borderRadius: 4,
           padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.black12),
-            borderRadius: BorderRadius.circular(4),
-          ),
+          constraints: const BoxConstraints(minWidth: double.infinity),
           child: Text(
             content,
             style: const TextStyle(fontSize: 12),
@@ -168,23 +163,39 @@ class ShopDetailScreen extends ConsumerWidget {
               child: const Text("No"),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(dialogContext);
-                // [수정됨] item 객체 전달
-                final success = ref
+                final userState = ref.read(userProvider);
+                if (userState.userId.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Please sign in first.")),
+                  );
+                  return;
+                }
+
+                final spent = await ref
                     .read(userProvider.notifier)
-                    .purchaseItem(item);
-                if (success) {
-                  ref.read(shopProvider.notifier).markAsSold(item.id);
+                    .spendCoins(item.price);
+                if (!spent) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Not enough coins!")),
+                    );
+                  }
+                  return;
+                }
+
+                await ref.read(purchaseRepositoryProvider).recordPurchase(item);
+                await ref
+                    .read(shopProvider.notifier)
+                    .markAsSold(item.id, buyerId: userState.userId);
+
+                if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text("Purchase Successful!")),
                   );
-                  Navigator.pop(context); // 상세창 닫기
-                  ref.read(homeTabProvider.notifier).state = 2; // 프로필로 이동
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Not enough coins!")),
-                  );
+                  Navigator.pop(context);
+                  ref.read(homeTabProvider.notifier).state = 2;
                 }
               },
               child: const Text("Yes"),

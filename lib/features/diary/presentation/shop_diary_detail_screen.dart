@@ -1,29 +1,73 @@
 // lib/features/diary/presentation/shop_diary_detail_screen.dart
 
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../data/purchase_repository.dart';
 
-class ShopDiaryDetailScreen extends ConsumerWidget {
-  final Map<String, String> entry;
+import '../../shop/domain/shop_item.dart';
 
-  const ShopDiaryDetailScreen({super.key, required this.entry});
+class ShopDiaryDetailScreen extends StatelessWidget {
+  final ShopItem item;
 
-  String _formatDate(String? raw) {
-    if (raw == null || raw.isEmpty) return '';
-    final dt = DateTime.tryParse(raw);
-    if (dt == null) return raw;
-    return DateFormat.yMMMMd().format(dt);
+  const ShopDiaryDetailScreen({super.key, required this.item});
+
+  String _formatDate(DateTime date) {
+    return DateFormat.yMMMMd().format(date);
   }
 
-  Widget _buildImage(String? path) {
-    if (path == null || path.isEmpty) {
+  @override
+  Widget build(BuildContext context) {
+    final dateText = _formatDate(item.date);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('${item.ownerName}\'s dream'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              dateText,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildImage(item.imageUrl),
+            const SizedBox(height: 16),
+            _buildInfoBox("Summary", item.summary ?? 'No summary'),
+            const SizedBox(height: 12),
+            _buildInfoBox("Interpretation", item.interpretation ?? 'No interpretation'),
+            const SizedBox(height: 16),
+            const Text(
+              "Dream Content",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.black12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                item.content,
+                style: const TextStyle(fontSize: 14, height: 1.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImage(String? url) {
+    if (url == null || url.isEmpty) {
       return Container(
         height: 180,
-        width: double.infinity,
         decoration: BoxDecoration(
           color: Colors.grey[200],
           borderRadius: BorderRadius.circular(8),
@@ -32,217 +76,39 @@ class ShopDiaryDetailScreen extends ConsumerWidget {
       );
     }
 
-    // network 또는 local 파일 판단
-    if (path.startsWith('http')) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.network(
-          path,
-          height: 180,
-          width: double.infinity,
-          fit: BoxFit.cover,
-        ),
-      );
-    }
-
-    try {
-      final file = File(path);
-      if (file.existsSync()) {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.file(
-            file,
-            height: 180,
-            width: double.infinity,
-            fit: BoxFit.cover,
-          ),
-        );
-      }
-    } catch (_) {
-      // ignore file errors
-    }
-
-    return Container(
-      height: 180,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(8),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.network(
+        url,
+        height: 180,
+        width: double.infinity,
+        fit: BoxFit.cover,
       ),
-      child: const Icon(Icons.broken_image, size: 56, color: Colors.grey),
     );
   }
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final dateText = _formatDate(entry['date']);
-    final summary = entry['summary'] ?? '';
-    final interpretation = entry['interpretation'] ?? '';
-    final content = entry['content'] ?? '';
-    final imagePath = entry['imagePath'];
-    final userCoins = entry['userCoins'] != null
-        ? int.tryParse(entry['userCoins']!) ?? 0
-        : 120;
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Diary detail'), centerTitle: true),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 날짜 + id
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      dateText,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Chip(
-                    label: Row(
-                      children: [
-                        const Icon(
-                          Icons.monetization_on,
-                          color: Colors.amber,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 6),
-                        Text('$userCoins'),
-                      ],
-                    ),
-                    backgroundColor: Colors.grey.shade100,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // 이미지
-              _buildImage(imagePath),
-              const SizedBox(height: 16),
-
-              // Summary + interpretation in cards
-              if (summary.isNotEmpty) ...[
-                const Text(
-                  'Summary',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Card(
-                  color: Colors.grey[50],
-                  elevation: 0,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(summary),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              if (interpretation.isNotEmpty) ...[
-                const Text(
-                  'Dream interpretation',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Card(
-                  color: Colors.grey[50],
-                  elevation: 0,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(interpretation),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              const Text(
-                'Content',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-
-              // 본문 영역
-              Expanded(
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SingleChildScrollView(
-                      child: Text(
-                        content,
-                        style: const TextStyle(fontSize: 15),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+  Widget _buildInfoBox(String label, String content) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.black12),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            content,
+            style: const TextStyle(fontSize: 12),
           ),
         ),
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          color: Colors.white,
-          child: Row(
-            children: [
-              Expanded(
-                child: TextButton.icon(
-                  onPressed: () {
-                    // share or other action - placeholder
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Shared (placeholder)')),
-                    );
-                  },
-                  icon: const Icon(Icons.share),
-                  label: const Text('Share'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: () {
-                  // Buy confirmation
-                  showDialog(
-                    context: context,
-                    builder: (_) => AlertDialog(
-                      title: const Text('Buy'),
-                      content: const Text('Do you want to buy this item?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            final purchaseRepo = ref.read(
-                              purchaseRepositoryProvider,
-                            );
-                            purchaseRepo.addPurchase(entry);
-                            Navigator.of(context).pop();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('구매가 완료되었습니다.')),
-                            );
-                          },
-                          child: const Text('Buy'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.shopping_cart),
-                label: const Text('Buy'),
-              ),
-            ],
-          ),
-        ),
-      ),
+      ],
     );
   }
 }
