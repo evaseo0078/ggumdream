@@ -50,21 +50,21 @@ class _SignupPageState extends ConsumerState<SignupPage> {
         password.isEmpty ||
         passwordCheck.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('모든 필드를 입력해 주세요.')),
+        const SnackBar(content: Text('Please fill in all fields.')),
       );
       return;
     }
 
     if (password.length < 8) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('비밀번호는 8자 이상이어야 합니다.')),
+        const SnackBar(content: Text('Password must be at least 8 characters long.')),
       );
       return;
     }
 
     if (password != passwordCheck) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('비밀번호가 일치하지 않습니다.')),
+        const SnackBar(content: Text('Passwords do not match.')),
       );
       return;
     }
@@ -72,7 +72,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
     final emailRegExp = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
     if (!emailRegExp.hasMatch(email)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('올바른 이메일 형식으로 입력해 주세요.')),
+        const SnackBar(content: Text('Please enter a valid email address.')),
       );
       return;
     }
@@ -91,7 +91,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('회원가입이 완료되었습니다. 로그인 해 주세요.')),
+        const SnackBar(content: Text('Sign-up completed. Please log in.')),
       );
 
       // 로그인 화면으로 이동
@@ -100,7 +100,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해 주세요.'),
+          content: Text('This nickname is already in use. Please enter a different nickname.'),
         ),
       );
     } on FirebaseAuthException catch (e) {
@@ -109,16 +109,16 @@ class _SignupPageState extends ConsumerState<SignupPage> {
       String message;
       switch (e.code) {
         case 'email-already-in-use':
-          message = '이미 사용 중인 이메일입니다.';
+          message = 'This email is already in use.';
           break;
         case 'weak-password':
-          message = '비밀번호가 너무 약합니다. 6자 이상으로 설정해 주세요.';
+          message = 'The password is too weak. Please use at least 6 characters.';
           break;
         case 'invalid-email':
-          message = '이메일 형식이 올바르지 않습니다.';
+          message = 'The email format is invalid.';
           break;
         default:
-          message = e.message ?? '회원가입에 실패했습니다. 잠시 후 다시 시도해 주세요.';
+          message = e.message ?? 'Sign-up failed. Please try again later.';
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -129,7 +129,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'),
+          content: Text('An unknown error occurred. Please try again later.'),
         ),
       );
     } finally {

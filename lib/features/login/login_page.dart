@@ -29,7 +29,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('이메일과 비밀번호를 입력해주세요')),
+        const SnackBar(content: Text('Please enter both email and password')),
       );
       return;
     }
@@ -46,7 +46,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       if (success) {
         context.go('/'); // ✅ 로그인 성공 시 다이어리로 이동
       } else {
-        final err = ref.read(authStateProvider).error ?? '로그인 실패';
+        final err = ref.read(authStateProvider).error ?? 'Failed to login.';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(err)),
         );
@@ -64,7 +64,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('로그인'),
+        title: const Text('Login'),
         centerTitle: true,
       ),
       body: Center(
@@ -87,7 +87,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               TextField(
                 controller: _emailController,
                 decoration: const InputDecoration(
-                  labelText: '이메일',
+                  labelText: 'Email',
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.emailAddress,
@@ -98,7 +98,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               TextField(
                 controller: _passwordController,
                 decoration: const InputDecoration(
-                  labelText: '비밀번호',
+                  labelText: 'Password',
                   border: OutlineInputBorder(),
                 ),
                 obscureText: true,
@@ -119,13 +119,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   onPressed: _isLoading ? null : _handleLogin,
                   child: _isLoading
                       ? const CircularProgressIndicator()
-                      : const Text('로그인'),
+                      : const Text('Login'),
                 ),
               ),
 
               TextButton(
                 onPressed: () => context.go('/login/signup'),
-                child: const Text('회원가입'),
+                child: const Text('Sign Up'),
               ),
             ],
           ),
