@@ -12,6 +12,10 @@ import 'firebase_options.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // ✅ .env 먼저 로드
+  await dotenv.load(fileName: ".env");
+
+  // ✅ 그 다음 Firebase 초기화
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );

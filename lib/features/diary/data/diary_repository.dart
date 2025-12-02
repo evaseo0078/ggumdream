@@ -2,14 +2,15 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
-import 'package:google_generative_ai/google_generative_ai.dart'; // Gemini SDK
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
 
 import '../domain/diary_entry.dart';
+import 'package:ggumdream/services/pollinations_proxy_service.dart';
 
-
-
+/// ---------------------------------------------------------------------------
+/// 1. 일기 리포지토리 (Firestore)
+/// ---------------------------------------------------------------------------
 class DiaryRepository {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
@@ -82,47 +83,38 @@ class DiaryRepository {
   }
 }
 
-// 2. LLM 서비스 (수정된 버전)
-// 2. LLM 서비스 (수정된 버전)
+/// ---------------------------------------------------------------------------
+/// 2. LLM 서비스 (Pollinations → Cloud Functions 경유 + Gemini 분석)
+/// ---------------------------------------------------------------------------
 class MockLLMService {
   final String _apiKey = dotenv.env['GEMINI_API_KEY'] ?? "";
-  
-  // Base64 이미지임을 알리는 접두어
-  static const String _imagePrefix = 'data:image/png;base64,';
 
-  // ---------------------------------------------------------
-  // [수정됨] 1. 이미지 생성 (Pollinations API 사용)
-  // 구글 API의 404 오류를 피하기 위해 완전 무료 API로 교체했습니다.
-  // ---------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // 1) 이미지 생성
+  //  - Flutter 앱 → Cloud Functions(generateImageFromPollinations)
+  //  - Functions가 Pollinations 호출 + Firebase Storage에 저장
+  //  - 여기서는 Storage 이미지 URL을 그대로 리턴
+  // -------------------------------------------------------------------------
   Future<String> generateImage(String prompt) async {
     try {
-      // 프롬프트가 한글일 경우를 대비해 URL 인코딩
-      final encodedPrompt = Uri.encodeComponent("dreamy watercolor painting of $prompt");
-      // Pollinations AI URL (API 키 필요 없음)
-      final url = Uri.parse('https://image.pollinations.ai/prompt/$encodedPrompt');
+      // 프롬프트 조금 꾸며서 전달 (취향대로 바꿔도 됨)
+      final refinedPrompt = "dreamy watercolor painting of $prompt";
 
-      // 이미지 데이터 다운로드
-      final response = await http.get(url);
+      // 서버 우회 호출 (직접 Pollinations를 부르지 않음)
+      final imageUrl =
+          await PollinationsProxyService.generateImage(refinedPrompt);
 
-      if (response.statusCode == 200) {
-        // 받아온 이미지 데이터를 Base64 문자열로 변환
-        final bytesBase64 = base64Encode(response.bodyBytes);
-        // 접두어를 붙여서 반환 (앱에서 바로 표시 가능)
-        return _imagePrefix + bytesBase64;
-      }
-      
-      print("이미지 생성 실패 (상태코드): ${response.statusCode}");
-      return "https://picsum.photos/300/300?error=api_fail";
-
+      return imageUrl; // Firebase Storage의 HTTPS 이미지 URL
     } catch (e) {
-      print("이미지 네트워크 오류: $e");
-      return "https://picsum.photos/seed/${prompt.length}/300/300?error=network"; 
+      print("이미지 생성 오류 (서버 우회 방식): $e");
+      // 완전히 실패하면 대체 이미지
+      return "https://picsum.photos/300/300?error=proxy_fail";
     }
   }
 
-  // ---------------------------------------------------------
-  // 2. 꿈 분석 (Gemini API 사용)
-  // ---------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // 2) 꿈 분석 (Gemini API 사용) – 기존 로직 그대로
+  // -------------------------------------------------------------------------
   Future<Map<String, String>> analyzeDream(String content) async {
     if (_apiKey.isEmpty) {
       await Future.delayed(const Duration(seconds: 1));
@@ -135,7 +127,7 @@ class MockLLMService {
 
     try {
       final model = GenerativeModel(
-        model: 'gemini-1.5-flash', 
+        model: 'gemini-2.5-flash',
         apiKey: _apiKey,
       );
 
@@ -144,9 +136,9 @@ class MockLLMService {
         Respond with a valid JSON object ONLY.
         JSON format:
         {
-          "summary": "한글 요약 (1문장)",
-          "interpretation": "한글 해석 (따뜻한 말투, 2문장)",
-          "mood": "이모지 1개"
+          "summary": "English summary (1 sentence)",
+          "interpretation": "English interpretation (warm tone, 2 sentences)",
+          "mood": "1 emoji"
         }
       """;
 
@@ -157,10 +149,12 @@ class MockLLMService {
       print("Gemini 응답 원본: ${response.text}");
 
       String contentString = response.text ?? "";
-      // 마크다운(```json)이 있을 경우 제거
-      contentString = contentString.replaceAll(RegExp(r'```json'), '').replaceAll(RegExp(r'```'), '').trim();
+      // 마크다운(```json ``` ) 제거
+      contentString = contentString
+          .replaceAll(RegExp(r'```json'), '')
+          .replaceAll(RegExp(r'```'), '')
+          .trim();
 
-      // JSON 파싱 시도, 실패하면 fallback
       Map<String, dynamic>? contentJson;
       try {
         contentJson = jsonDecode(contentString);
@@ -169,23 +163,23 @@ class MockLLMService {
         return {
           "summary": "분석 결과를 이해할 수 없습니다.",
           "interpretation": "AI 응답이 올바른 JSON이 아닙니다.",
-          "mood": "❓"
+          "mood": "❓",
         };
       }
 
       return {
         "summary": contentJson?['summary']?.toString() ?? "요약 실패",
-        "interpretation": contentJson?['interpretation']?.toString() ?? "해석 실패",
+        "interpretation":
+            contentJson?['interpretation']?.toString() ?? "해석 실패",
         "mood": contentJson?['mood']?.toString() ?? "❓",
       };
-
     } catch (e) {
       print("Gemini 분석 오류: $e");
       print("입력값: $content");
       return {
         "summary": "분석에 실패했어요",
         "interpretation": "잠시 후 다시 시도해주세요.",
-        "mood": "⚠️"
+        "mood": "⚠️",
       };
     }
   }
