@@ -275,6 +275,40 @@ class _DiarySettingScreenState extends ConsumerState<DiarySettingScreen> {
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
+                "판매 중인 일기",
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade400),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text("판매 중인 일기가 없습니다."), // Placeholder
+            ),
+            const SizedBox(height: 24),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                "판매 완료",
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade400),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text("판매 완료된 일기가 없습니다."), // Placeholder
+            ),
+            const SizedBox(height: 24),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
                 "Sales History",
                 style: Theme.of(context).textTheme.titleMedium,
               ),
