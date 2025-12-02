@@ -51,6 +51,41 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     super.dispose();
   }
 
+  Future<void> _saveDraft() async {
+    final text = _textController.text.trim();
+    if (text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please write something first.")),
+      );
+      return;
+    }
+
+    final finalSleepDuration = _isSleepUnknown ? -1.0 : _sleepDuration;
+    final bool isEditMode = widget.existingEntry != null;
+
+    final draftEntry = DiaryEntry(
+      id: isEditMode ? widget.existingEntry!.id : const Uuid().v4(),
+      date: isEditMode ? widget.existingEntry!.date : widget.selectedDate,
+      content: text,
+      mood: isEditMode ? widget.existingEntry!.mood : "📝",
+      sleepDuration: finalSleepDuration,
+      isDraft: true,
+      isSold: isEditMode ? widget.existingEntry!.isSold : false,
+    );
+
+    if (isEditMode) {
+      ref.read(diaryListProvider.notifier).updateDiary(draftEntry);
+    } else {
+      ref.read(diaryListProvider.notifier).addDiary(draftEntry);
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Draft saved!")),
+    );
+    Navigator.pop(context);
+  }
+
   Future<void> _processAndSave() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
@@ -238,7 +273,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                               ),
                               Slider(
                                 value: _sleepDuration,
-                                min: 0, max: 12, divisions: 24, 
+                                min: 0, max: 16, divisions: 32, 
                                 activeColor: const Color(0xFFAABCC5), inactiveColor: Colors.grey[300],
                                 onChanged: (value) => setState(() => _sleepDuration = value),
                               ),
@@ -273,14 +308,21 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            Align(
-              alignment: Alignment.centerRight,
-              // ⚡ 버튼 텍스트도 상황에 맞게 변경
-              child: GgumButton(
-                width: 120,
-                text: widget.existingEntry != null ? "UPDATE" : "POST!", 
-                onPressed: _processAndSave,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                GgumButton(
+                  width: 120,
+                  text: "SAVE DRAFT",
+                  onPressed: _saveDraft,
+                ),
+                const SizedBox(width: 12),
+                GgumButton(
+                  width: 120,
+                  text: widget.existingEntry != null ? "UPDATE" : "POST!",
+                  onPressed: _processAndSave,
+                ),
+              ],
             ),
           ],
         ),

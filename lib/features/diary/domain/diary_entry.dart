@@ -13,6 +13,7 @@ class DiaryEntry {
   final String mood;
   final double sleepDuration;
   final bool isSold;
+  final bool isDraft; // 임시저장 여부
 
   const DiaryEntry({
     required this.id,
@@ -24,6 +25,7 @@ class DiaryEntry {
     this.mood = '🙂',
     this.sleepDuration = 7.0,
     this.isSold = false,
+    this.isDraft = false,
   });
 
   DiaryEntry copyWith({
@@ -36,6 +38,7 @@ class DiaryEntry {
     String? mood,
     double? sleepDuration,
     bool? isSold,
+    bool? isDraft,
   }) {
     return DiaryEntry(
       id: id ?? this.id,
@@ -47,6 +50,7 @@ class DiaryEntry {
       mood: mood ?? this.mood,
       sleepDuration: sleepDuration ?? this.sleepDuration,
       isSold: isSold ?? this.isSold,
+      isDraft: isDraft ?? this.isDraft,
     );
   }
 
@@ -60,6 +64,7 @@ class DiaryEntry {
       'mood': mood,
       'sleepDuration': sleepDuration,
       'isSold': isSold,
+      'isDraft': isDraft,
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }
@@ -86,6 +91,7 @@ class DiaryEntry {
       sleepDuration:
           (data['sleepDuration'] is num) ? (data['sleepDuration'] as num).toDouble() : 7.0,
       isSold: data['isSold'] as bool? ?? false,
+      isDraft: data['isDraft'] as bool? ?? false,
     );
   }
 }

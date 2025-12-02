@@ -23,8 +23,8 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
     final shopItems = ref.watch(shopProvider);
 
     final filteredItems = _showMySales
-        ? shopItems.where((item) => item.ownerId == userState.userId).toList()
-        : shopItems.where((item) => item.ownerId != userState.userId).toList();
+        ? shopItems.where((item) => item.sellerUid == userState.userId).toList()
+        : shopItems.where((item) => item.sellerUid != userState.userId).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -131,7 +131,7 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
     ShopItem item,
     String userId,
   ) {
-    final isMine = item.ownerId == userId;
+    final isMine = item.sellerUid == userId;
     final dateText = DateFormat('yyyy.MM.dd').format(item.date);
 
     return GestureDetector(
@@ -243,7 +243,7 @@ class WobblyPriceTag extends StatelessWidget {
         border: Border.all(color: Colors.black12),
       ),
       child: Text(
-        "$price GG",
+        "$price coins",
         style: TextStyle(
           color: isSold ? Colors.white : Colors.black,
           fontWeight: FontWeight.bold,
