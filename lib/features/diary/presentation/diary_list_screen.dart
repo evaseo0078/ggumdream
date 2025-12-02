@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 
 import '../../music/presentation/sleep_mode_screen.dart';
 import '../../shop/domain/shop_item.dart';
@@ -11,7 +12,7 @@ import '../application/user_provider.dart';
 import '../domain/diary_entry.dart';
 import 'diary_detail_screen.dart';
 import 'diary_editor_screen.dart';
-import 'package:ggumdream/shared/widgets/wobbly_painter.dart';
+
 
 class DiaryListScreen extends ConsumerStatefulWidget {
   const DiaryListScreen({super.key});
@@ -263,7 +264,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     ShopItem? matchingShopItem;
     try {
       matchingShopItem = shopItems.firstWhere(
-        (item) => item.content == entry.content && item.ownerName == ref.read(userProvider).username,
+        (item) => item.diaryId == entry.id && item.ownerName == ref.read(userProvider).username,
       );
     } catch (e) {
       matchingShopItem = null;
@@ -455,7 +456,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     ShopItem? matchingShopItem;
     try {
       matchingShopItem = shopItems.firstWhere(
-        (item) => item.content == entry.content && item.ownerName == ref.read(userProvider).username,
+        (item) => item.diaryId == entry.id && item.ownerName == ref.read(userProvider).username,
       );
     } catch (e) {
       matchingShopItem = null;
@@ -622,8 +623,12 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
               if (!context.mounted) return;
               if (newPrice != null) {
                 try {
-                  ref.read(shopProvider.notifier).updatePrice(entry.content, newPrice);
-                  ref.read(userProvider.notifier).updateSalePrice(entry.content, newPrice);
+                  final shopItems = ref.read(shopProvider);
+                  final matchingItem = shopItems.firstWhere(
+                    (item) => item.diaryId == entry.id && item.ownerName == ref.read(userProvider).username,
+                  );
+                  ref.read(shopProvider.notifier).updatePrice(matchingItem.id, newPrice);
+                  ref.read(userProvider.notifier).updateSalePrice(entry.id, newPrice);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text("Price updated to $newPrice coins!")),
                   );
@@ -646,30 +651,44 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     );
   }
 
-  void _registerToShop(BuildContext context, WidgetRef ref, DiaryEntry entry, int price) {
-    ref.read(diaryListProvider.notifier).toggleSell(entry.id);
-    final newItem = ShopItem(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      date: DateFormat('yyyy.MM.dd').format(entry.date),
-      content: entry.content,
-      ownerName: ref.read(userProvider).username,
-      price: price,
-      summary: entry.summary,
-      interpretation: entry.interpretation,
-      imageUrl: entry.imageUrl,
-    );
-    ref.read(shopProvider.notifier).addItem(newItem);
-    ref.read(userProvider.notifier).recordSale(newItem);
+  void _registerToShop(BuildContext context, WidgetRef ref, DiaryEntry entry, int price) async {
+    try {
+      // Firestore에 등록하고 생성된 ShopItem을 받아옴
+      final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please log in first")),
+        );
+        return;
+      }
+      
+      final newItem = await ref.read(shopProvider.notifier).createListing(
+        diary: entry,
+        ownerId: currentUser.uid, // Firebase UID 직접 사용
+        ownerName: ref.read(userProvider).username,
+        price: price,
+      );
+      
+      // 일기 상태 업데이트
+      ref.read(diaryListProvider.notifier).setSellStatus(entry.id, true);
+      
+      // 사용자 판매 이력에 추가
+      ref.read(userProvider.notifier).recordSale(newItem);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Registered for $price coins!")),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Registered for $price coins!")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to register: $e")),
+      );
+    }
   }
 
   void _cancelSale(BuildContext context, WidgetRef ref, DiaryEntry entry) {
-    ref.read(diaryListProvider.notifier).toggleSell(entry.id);
-    ref.read(shopProvider.notifier).removeItemByContent(entry.content);
-    ref.read(userProvider.notifier).cancelSale(entry.content);
+    ref.read(diaryListProvider.notifier).setSellStatus(entry.id, false);
+    ref.read(shopProvider.notifier).cancelListing(entry.id);
+    ref.read(userProvider.notifier).cancelSale(entry.id);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Sale Canceled.")),
     );

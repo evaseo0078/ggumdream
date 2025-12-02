@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../diary/domain/diary_entry.dart';
 import '../domain/shop_item.dart';
@@ -27,11 +28,16 @@ class MarketRepository {
     required String ownerName,
     required int price,
   }) async {
+    // Debug: Check current user auth
+    final currentUser = FirebaseAuth.instance.currentUser;
+    print('DEBUG - Current user UID: ${currentUser?.uid}');
+    print('DEBUG - ownerId parameter: $ownerId');
+    
     final doc = _items.doc();
     final item = ShopItem(
       id: doc.id,
       diaryId: diary.id,
-      ownerId: ownerId,
+      sellerUid: ownerId,
       ownerName: ownerName,
       date: diary.date,
       content: diary.content,
@@ -43,6 +49,7 @@ class MarketRepository {
       createdAt: DateTime.now(),
     );
 
+    print('DEBUG - ShopItem data: ${item.toFirestore()}');
     await doc.set(item.toFirestore());
     return item;
   }
