@@ -46,6 +46,7 @@ class AuthRepository {
     required String nickname,
     required String email,
     required String password,
+    String profileImage = 'assets/images/profile1.png',
   }) async {
     // 1) 닉네임 중복 검사
     final dup = await _db
@@ -93,8 +94,10 @@ class AuthRepository {
       'name': name,
       'nickname': nickname,
       'email': email,
+      'uid': uid,
       'coins': 1000,
       'createdAt': FieldValue.serverTimestamp(),
+      'profileImage': profileImage,
     });
 
     // 4) 로컬에도 이메일/비밀번호 저장 (자동 로그인 용도)
@@ -158,5 +161,19 @@ class AuthRepository {
 
     final username = await _storage.read(key: _keyUsername);
     return username != null;
+  }
+
+  Future<void> updateUserProfile({
+    required String uid,
+    String? nickname,
+    String? profileImage,
+  }) async {
+    final Map<String, dynamic> data = {};
+    if (nickname != null && nickname.isNotEmpty) data['nickname'] = nickname;
+    if (profileImage != null) data['profileImage'] = profileImage;
+
+    if (data.isNotEmpty) {
+      await _db.collection('users').doc(uid).update(data);
+    }
   }
 }

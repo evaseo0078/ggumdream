@@ -6,15 +6,21 @@ class UserState {
   final String username;
   final String userId;
   final int coins;
+  final String profileImage;
 
   const UserState({
     required this.username,
     required this.userId,
     required this.coins,
+    required this.profileImage,
   });
 
-  factory UserState.initial() =>
-      const UserState(username: 'Dreamer', userId: '', coins: 0);
+  factory UserState.initial() => const UserState(
+        username: 'Dreamer',
+        userId: '',
+        coins: 0,
+        profileImage: 'assets/images/profile1.png',
+      );
 
   factory UserState.fromFirestore(String uid, Map<String, dynamic> data) {
     return UserState(
@@ -24,6 +30,8 @@ class UserState {
           'Dreamer',
       userId: uid,
       coins: (data['coins'] is num) ? (data['coins'] as num).toInt() : 0,
+      profileImage:
+          data['profileImage'] as String? ?? 'assets/images/profile1.png',
     );
   }
 
@@ -31,11 +39,13 @@ class UserState {
     String? username,
     String? userId,
     int? coins,
+    String? profileImage,
   }) {
     return UserState(
       username: username ?? this.username,
       userId: userId ?? this.userId,
       coins: coins ?? this.coins,
+      profileImage: profileImage ?? this.profileImage,
     );
   }
 }
@@ -72,14 +82,21 @@ class UserNotifier extends StateNotifier<UserState> {
     required String username,
     required String userId,
     required int coins,
+    String? profileImage,
   }) async {
-    state = state.copyWith(username: username, userId: userId, coins: coins);
+    state = state.copyWith(
+      username: username,
+      userId: userId,
+      coins: coins,
+      profileImage: profileImage,
+    );
     if (userId.isEmpty) return;
 
     await _users.doc(userId).set(
       {
         'nickname': username,
         'coins': coins,
+        if (profileImage != null) 'profileImage': profileImage,
       },
       SetOptions(merge: true),
     );
