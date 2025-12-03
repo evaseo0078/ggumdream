@@ -85,7 +85,9 @@ flutter:
   uses-material-design: true
   assets:
     - assets/music/
+    - assets/icons/
     - assets/images/
+    - .env
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
@@ -113,6 +115,9 @@ flutter:
   #       - asset: fonts/TrajanPro.ttf
   #       - asset: fonts/TrajanPro_Bold.ttf
   #         weight: 700
+    
+  #   10a0set: fonts/TrajanPro_Italic.ttf
+  #   - family: Schyler
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package

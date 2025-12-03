@@ -13,6 +13,32 @@ import '../domain/diary_entry.dart';
 import 'diary_detail_screen.dart';
 import 'diary_editor_screen.dart';
 
+import 'dart:ui';
+
+Widget glassCard({
+  required Widget child,
+  double radius = 16,
+  double opacity = 0.1,
+}) {
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(radius),
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(opacity),
+          borderRadius: BorderRadius.circular(radius),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.1),
+            width: 2.5,
+          ),
+        ),
+        child: child,
+      ),
+    ),
+  );
+}
+
 
 class DiaryListScreen extends ConsumerStatefulWidget {
   const DiaryListScreen({super.key});
@@ -36,221 +62,234 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
         : diaryList;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFDCE4E8),
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        _isCalendarView ? Icons.format_list_bulleted : Icons.calendar_month,
-                        color: Colors.black87,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _isCalendarView = !_isCalendarView;
-                          if (!_isCalendarView) _selectedDay = null;
-                        });
-                      },
-                    ),
-                    const Text(
-                      "My GGUM DREAM",
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Stencil',
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.music_note, color: Colors.deepPurple),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const SleepModeScreen()),
-                        );
-                      },
-                    ),
-                  ],
-                ),
+      body: Stack(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color.fromARGB(255, 255, 237, 253),
+                  Color.fromARGB(255, 205,230,246),
+                  Color.fromARGB(255, 172,193,242),
+                  Color.fromARGB(255, 211,202,239),
+                  Color.fromARGB(255, 137,180,239),
+                  Color.fromARGB(255, 142, 124, 232),
+                ],
+                stops: [0.0, 0.3, 0.5, 0.7, 0.8, 1.0],
               ),
             ),
-
-            if (_isCalendarView)
-              SliverToBoxAdapter(
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.6),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.black12, width: 4),
-                  ),
-                  child: TableCalendar(
-                    firstDay: DateTime.utc(2023, 1, 1),
-                    lastDay: DateTime.utc(2025, 12, 31),
-                    focusedDay: _focusedDay,
-                    selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-                    onDaySelected: (selectedDay, focusedDay) {
-                      setState(() {
-                        if (_selectedDay != null && isSameDay(_selectedDay, selectedDay)) {
-                          _selectedDay = null;
-                        } else {
-                          _selectedDay = selectedDay;
-                        }
-                        _focusedDay = focusedDay;
-                      });
-                    },
-                    onPageChanged: (focusedDay) {
-                      setState(() => _focusedDay = focusedDay);
-                    },
-                    headerStyle: HeaderStyle(
-                      formatButtonVisible: false,
-                      titleCentered: true,
-                      titleTextStyle: const TextStyle(
-                        fontFamily: 'Stencil',
-                        fontSize: 18,
-                      ),
-                      leftChevronIcon: GestureDetector(
-                        onTap: () {
-                          final previousMonth = DateTime(_focusedDay.year, _focusedDay.month - 1);
-                          if (previousMonth.isBefore(DateTime.utc(2023, 1, 1))) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Only diaries from the last 3 years are saved.'),
-                                duration: Duration(seconds: 2),
-                              ),
+          ),
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.4, // Adjusted transparency
+              child: Image.asset(
+                'assets/images/diary_list_background.png',
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          SafeArea(
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            _isCalendarView ? Icons.format_list_bulleted : Icons.calendar_month,
+                            color: const Color.fromARGB(221, 255, 255, 255),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _isCalendarView = !_isCalendarView;
+                              if (!_isCalendarView) _selectedDay = null;
+                            });
+                          },
+                        ),
+                        const Text(
+                          "My GGUM DREAM",
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Stencil',
+                            color: Color.fromARGB(255, 255, 255, 255)
+                          ),
+                        ),
+                        IconButton(
+                          icon: Image.asset(
+                            'assets/icons/music_note.png',
+                            width: 32,
+                            height: 32,
+                            color: const Color.fromARGB(255, 255, 255, 255),
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const SleepModeScreen()),
                             );
-                          } else {
-                            setState(() => _focusedDay = previousMonth);
-                          }
-                        },
-                        child: const Icon(Icons.chevron_left, color: Colors.black87),
-                      ),
-                      rightChevronIcon: GestureDetector(
-                        onTap: () {
-                          final nextMonth = DateTime(_focusedDay.year, _focusedDay.month + 1);
-                          if (nextMonth.isAfter(DateTime.utc(2025, 12, 31))) {
-                            showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                content: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.calendar_month,
-                                      size: 80,
-                                      color: Color(0xFFAABCC5),
-                                    ),
-                                    const SizedBox(height: 20),
-                                    const Text(
-                                      '2026',
-                                      style: TextStyle(
-                                        fontSize: 32,
-                                        fontWeight: FontWeight.bold,
-                                        fontFamily: 'Stencil',
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    const Text(
-                                      'Coming Soon! ✨',
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      'The next version will be\nreleased in 2026.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey[700],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text('OK'),
-                                  ),
-                                ],
-                              ),
-                            );
-                          } else {
-                            setState(() => _focusedDay = nextMonth);
-                          }
-                        },
-                        child: const Icon(Icons.chevron_right, color: Colors.black87),
-                      ),
-                    ),
-                    calendarStyle: const CalendarStyle(
-                      todayDecoration: BoxDecoration(color: Color(0xFFAABCC5), shape: BoxShape.circle),
-                      selectedDecoration: BoxDecoration(color: Colors.deepPurple, shape: BoxShape.circle),
-                    ),
-                    eventLoader: (day) => diaryList.where((entry) => isSameDay(entry.date, day)).toList(),
-                    calendarBuilders: CalendarBuilders(
-                      markerBuilder: (context, date, events) {
-                        if (events.isEmpty) return null;
-                        final mood = (events.first as DiaryEntry).mood;
-                        return Positioned(
-                          bottom: 1,
-                          child: Text(mood, style: const TextStyle(fontSize: 12)),
-                        );
-                      },
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ),
+                if (_isCalendarView)
+                  SliverToBoxAdapter(
+  child: Center(
+    child: glassCard(
+      radius: 20,
+      opacity: 0.23,
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.86,
+        margin: const EdgeInsets.only(top: 10, bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: TableCalendar(
+          firstDay: DateTime.utc(2020, 1, 1),
+          lastDay: DateTime.utc(2030, 12, 31),
+          focusedDay: _focusedDay,
+          selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
 
-            displayList.isEmpty
-                ? SliverFillRemaining(
-                    child: Center(
-                      child: Text(
-                        _isCalendarView && _selectedDay != null 
-                            ? "No dreams on this day.\nTap + to write!" 
-                            : "Let's make your\nfirst post",
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 16, color: Colors.black54),
-                      ),
-                    ),
-                  )
-                : SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: _buildDiaryCard(context, ref, displayList[index]),
-                        );
-                      },
-                      childCount: displayList.length,
-                    ),
-                  ),
+          onDaySelected: (selectedDay, focusedDay) {
+            setState(() {
+              if (_selectedDay != null && isSameDay(_selectedDay, selectedDay)) {
+                _selectedDay = null;
+              } else {
+                _selectedDay = selectedDay;
+              }
+              _focusedDay = focusedDay;
+            });
+          },
 
-            const SliverToBoxAdapter(child: SizedBox(height: 80)),
-          ],
+          headerStyle: const HeaderStyle(
+            formatButtonVisible: false,
+            titleCentered: true,
+            titleTextStyle: TextStyle(
+              fontFamily: 'Stencil',
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+            leftChevronPadding: EdgeInsets.zero,
+            rightChevronPadding: EdgeInsets.zero,
+          ),
+
+          // ⭐️ rowHeight 대신 padding/margin 축소로 크기 줄이기
+          calendarStyle: const CalendarStyle(
+            cellMargin: EdgeInsets.all(0),      // 셀 사이 마진 완전 제거
+            cellPadding: EdgeInsets.all(2),     // 셀 패딩 작게
+            todayDecoration: BoxDecoration(
+              color: Color.fromARGB(255, 213, 215, 216),
+              shape: BoxShape.circle,
+            ),
+            selectedDecoration: BoxDecoration(
+              color: Color.fromARGB(255, 183, 150, 240),
+              shape: BoxShape.circle,
+              
+            ),
+          ),
+
+          daysOfWeekStyle: const DaysOfWeekStyle(
+            weekdayStyle: TextStyle(fontSize: 11),
+            weekendStyle: TextStyle(fontSize: 11),
+          ),
+
+          calendarBuilders: CalendarBuilders(
+            markerBuilder: (context, date, events) {
+              if (events.isEmpty) return null;
+              final mood = (events.first as DiaryEntry).mood;
+              return Positioned(
+                bottom: 1,
+                child: Text(
+                  mood,
+                  style: const TextStyle(fontSize: 10),
+                ),
+              );
+            },
+          ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFFAABCC5),
-        child: const Icon(Icons.edit, color: Colors.black87),
-        onPressed: () {
-          final dateToWrite = _selectedDay ?? DateTime.now();
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => DiaryEditorScreen(selectedDate: dateToWrite),
+    ),
+  ),
+),
+const SliverToBoxAdapter(
+  child: SizedBox(height: 10),  // ← 여기서 원하는 높이로 조절
+),
+
+                displayList.isEmpty
+                    ? SliverFillRemaining(
+                        child: Center(
+                          child: Text(
+                            _isCalendarView && _selectedDay != null
+                                ? "No dreams on this day.\nTap + to write!"
+                                : "Let's make your\nfirst post",
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 16, color: Colors.black54),
+                          ),
+                        ),
+                      )
+                    : SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _buildDiaryCard(context, ref, displayList[index]),
+          ),
+
+          // ⭐ 새로운 공백 (일기 카드들 사이 공간)
+          const SizedBox(height: 10),  // ← 여백 높이 조절 가능
+        ],
+      );
+                          },
+                          childCount: displayList.length,
+                        ),
+                      ),
+                const SliverToBoxAdapter(child: SizedBox(height: 80)),
+              ],
             ),
-          );
-        },
+          ),
+        ],
       ),
+      floatingActionButton: GestureDetector(
+  onTap: () {
+    final dateToWrite = _selectedDay ?? DateTime.now();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DiaryEditorScreen(selectedDate: dateToWrite),
+      ),
+    );
+  },
+
+  child: ClipRRect(
+    borderRadius: BorderRadius.circular(50), // 🔥 완전 동그라미
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12), // 🔥 유리 흐림 효과
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withOpacity(0.25), // 🔥 유리 반투명
+          border: Border.all(
+            color: Colors.white.withOpacity(0.4),
+            width: 1.5,
+          ),
+        ),
+        child: const Icon(
+          Icons.edit,
+          color: Colors.white,
+          size: 28,
+        ),
+      ),
+    ),
+  ),
+),
     );
   }
 
@@ -274,20 +313,21 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     final bool isListed = matchingShopItem != null;
 
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => DiaryDetailScreen(entry: entry)),
-        );
-      },
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => DiaryDetailScreen(entry: entry)),
+    );
+  },
+
+  child: Center( // 🔥 가운데 정렬
+    child: glassCard(
+      radius: 14,
+      opacity: 0.22,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: Colors.black12),
-        ),
+        width: MediaQuery.of(context).size.width * 0.86, // 🔥 카드 폭 줄이기
+        margin: const EdgeInsets.only(bottom: 14),       // 🔥 아래 간격 줄이기
+        padding: const EdgeInsets.all(10),               // 🔥 패딩 줄이기
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -300,7 +340,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                 ),
                 InkWell(
                   onTap: () => _confirmDelete(context, ref, entry.id),
-                  child: const Icon(Icons.delete_outline, size: 20),
+                  child: const Icon(Icons.delete_outline, size: 20, color: Color.fromARGB(255, 70, 70, 70)),
                 ),
               ],
             ),
@@ -309,14 +349,14 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 80,
-                  height: 80,
+                  width: 72, // 🔥 조금 더 작게
+                  height: 72,
                   color: Colors.grey[300],
                   child: entry.imageUrl != null
                       ? Image.network(entry.imageUrl!, fit: BoxFit.cover)
                       : const Icon(Icons.image, color: Colors.grey),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -327,7 +367,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 12),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Align(
                         alignment: Alignment.centerRight,
                         child: InkWell(
@@ -339,18 +379,19 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                             ),
                             decoration: BoxDecoration(
                               color: isSoldOut
-                                  ? Colors.grey
-                                  : (isListed ? Colors.orangeAccent : const Color(0xFFAABCC5)),
+                                  ? const Color.fromARGB(255, 255, 255, 255)
+                                  : (isListed ? const Color.fromRGBO(255, 209, 150, 1) : const Color.fromARGB(100, 255, 255, 255)),
                               borderRadius: BorderRadius.circular(12),
+                              
                             ),
                             child: Text(
-                              isSoldOut 
-                                  ? "Sold Out" 
+                              isSoldOut
+                                  ? "Sold Out"
                                   : (isListed ? "Selling" : "Sell"),
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: Color.fromARGB(255, 71, 71, 71),
                               ),
                             ),
                           ),
@@ -364,30 +405,33 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
           ],
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 
   Widget _buildDraftCard(BuildContext context, WidgetRef ref, DiaryEntry entry) {
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => DiaryEditorScreen(
-              selectedDate: entry.date,
-              existingEntry: entry,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: Colors.orange, width: 2),
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DiaryEditorScreen(
+          selectedDate: entry.date,
+          existingEntry: entry,
         ),
+      ),
+    );
+  },
+
+  child: Center( // 🔥 가운데 정렬
+    child: glassCard(
+      radius: 12,
+      opacity: 0.20,
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.86, // 🔥 통일감
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -426,14 +470,14 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              entry.content.length > 50 
-                  ? '${entry.content.substring(0, 50)}...' 
+              entry.content.length > 50
+                  ? '${entry.content.substring(0, 50)}...'
                   : entry.content,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 12, color: Colors.black87),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             const Text(
               "Tap to complete and analyze",
               style: TextStyle(fontSize: 11, color: Colors.orange, fontStyle: FontStyle.italic),
@@ -441,7 +485,10 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
           ],
         ),
       ),
-    );
+    ),
+  ),
+);
+
   }
 
   void _handleSellButtonTap(BuildContext context, WidgetRef ref, DiaryEntry entry, bool isSoldOut) async {

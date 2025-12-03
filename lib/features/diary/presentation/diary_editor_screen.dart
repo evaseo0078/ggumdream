@@ -8,6 +8,8 @@ import '../application/user_provider.dart';
 import '../domain/diary_entry.dart';
 import 'diary_detail_screen.dart';
 import 'package:ggumdream/shared/widgets/wobbly_painter.dart'; // FIX: 패키지 경로로 변경
+import 'dart:ui';
+
 
 class DiaryEditorScreen extends ConsumerStatefulWidget {
   final DateTime selectedDate;
@@ -185,146 +187,219 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     final dateStr = DateFormat('yyyy/MM/dd (E)').format(displayDate);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        leading: const BackButton(color: Colors.black),
+        leading: const BackButton(color: Color.fromARGB(255, 255, 255, 255)),
         title: Text(dateStr,
             style: const TextStyle(
-                color: Colors.black,
+                color: Color.fromARGB(255, 255, 255, 255),
                 fontWeight: FontWeight.bold,
                 fontFamily: 'Stencil')),
+                backgroundColor: const Color.fromARGB(255, 192, 171, 255),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text("How long did you sleep?",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFE6E6FA), // Light purple
+              Color.fromARGB(255, 168, 152, 255),
+              Color.fromARGB(255, 152, 176, 255) // Dark purple
+            ],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("How long did you sleep?",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 129, 129, 129))),
+              const SizedBox(height: 10),
 
-            // 수면 시간 입력 박스 (WobblyContainer 적용)
-            WobblyContainer(
-              backgroundColor: Colors.white,
-              borderColor: Colors.black12,
-              borderRadius: 12,
-              padding: EdgeInsets.zero,
-              child: Column(
+              // 수면 시간 입력 박스 (WobblyContainer 적용)
+              ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14), // 🔥 blur 강하게 적용
+        child: WobblyContainer(
+          backgroundColor: Colors.white.withOpacity(0.15), // 🔥 Glass 배경
+          borderColor: Colors.white.withOpacity(0.45),      // 🔥 Glass 테두리
+          borderRadius: 20,
+          padding: EdgeInsets.zero,
+
+          child: Column(
+            children: [
+              // --- 탭 버튼 영역 ---
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: () => setState(() => _isSleepUnknown = false),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            decoration: BoxDecoration(
-                              color: !_isSleepUnknown
-                                  ? const Color(0xFFAABCC5)
-                                  : Colors.transparent,
-                              borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(11)),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text("Input Time", style: TextStyle(fontWeight: FontWeight.bold, color: !_isSleepUnknown ? Colors.black : Colors.grey)),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => setState(() => _isSleepUnknown = false),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: !_isSleepUnknown
+                              ? const Color.fromARGB(255, 190, 150, 255).withOpacity(0.2) // 선택된 탭 더 밝게
+                              : const Color.fromARGB(0, 176, 149, 255),
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(20),
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          "Input Time",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: !_isSleepUnknown ? Colors.white : Colors.white70,
                           ),
                         ),
                       ),
-                      const SizedBox(
-                          width: 1,
-                          height: 40,
-                          child: VerticalDivider()), // 세로 선은 그대로 유지
-                      Expanded(
-                        child: InkWell(
-                          onTap: () => setState(() => _isSleepUnknown = true),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            decoration: BoxDecoration(
-                              color: _isSleepUnknown
-                                  ? const Color(0xFFAABCC5)
-                                  : Colors.transparent,
-                              borderRadius: const BorderRadius.only(
-                                  topRight: Radius.circular(11)),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text("Don't Know", style: TextStyle(fontWeight: FontWeight.bold, color: _isSleepUnknown ? Colors.black : Colors.grey)),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                  const Divider(height: 1, thickness: 1),
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: _isSleepUnknown
-                        ? const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 10),
-                            child: Text("Sleep duration will not be recorded.", style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
-                          )
-                        : Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Icon(Icons.bedtime, color: Colors.deepPurple),
-                                  Text("${_sleepDuration.toStringAsFixed(1)} Hours", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.deepPurple)),
-                                ],
-                              ),
-                              Slider(
-                                value: _sleepDuration,
-                                min: 0, max: 16, divisions: 32, 
-                                activeColor: const Color(0xFFAABCC5), inactiveColor: Colors.grey[300],
-                                onChanged: (value) => setState(() => _sleepDuration = value),
-                              ),
-                            ],
+
+                  const SizedBox(
+                    width: 1,
+                    height: 40,
+                    child: VerticalDivider(color: Colors.white54),
+                  ),
+
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => setState(() => _isSleepUnknown = true),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _isSleepUnknown
+                              ? Color.fromARGB(255, 190, 150, 255).withOpacity(0.35)
+                              : Colors.transparent,
+                          borderRadius: const BorderRadius.only(
+                            topRight: Radius.circular(20),
                           ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          "Don't Know",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: _isSleepUnknown ? Colors.white : Colors.white70,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ),
 
-            const SizedBox(height: 30),
+              const Divider(height: 1, thickness: 1, color: Colors.white30),
 
-            const Text("Write your dream (min 20 chars)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Expanded(
-              // 꿈 내용 입력 박스 (WobblyContainer 적용)
-              child: WobblyContainer(
-                backgroundColor: Colors.white,
-                borderColor: Colors.black12,
-                borderRadius: 8,
-                padding: const EdgeInsets.all(16),
-                child: TextField(
-                  controller: _textController,
-                  maxLines: null,
-                  expands: true,
-                  style: const TextStyle(fontSize: 16, height: 1.5),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    hintText: "Describe what happened in your dream...",
-                  ),
-                ),
+              // --- 입력 값 및 슬라이더 표시 ---
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: _isSleepUnknown
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: Text(
+                          "Sleep duration will not be recorded.",
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      )
+                    : Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Icon(Icons.bedtime, color: Colors.white),
+                              Text(
+                                "${_sleepDuration.toStringAsFixed(1)} Hours",
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Slider(
+                            value: _sleepDuration,
+                            min: 0,
+                            max: 16,
+                            divisions: 32,
+                            activeColor: Colors.white,
+                            inactiveColor: Colors.white30,
+                            onChanged: (value) =>
+                                setState(() => _sleepDuration = value),
+                          ),
+                        ],
+                      ),
               ),
+            ],
+          ),
+        ),
+      ),
+    ),
+
+
+              const SizedBox(height: 30),
+
+              const Text("Write your dream (min 20 chars)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 255, 255, 255) )),
+              const SizedBox(height: 10),
+              Expanded(
+  child: ClipRRect(
+    borderRadius: BorderRadius.circular(20),
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12), // 🔥 blur
+      child: WobblyContainer(
+        backgroundColor: Colors.white.withOpacity(0.3), // 🔥 Glass 투명 배경
+        borderColor: Colors.white.withOpacity(0.5),      // 🔥 은은한 흰 테두리
+        borderRadius: 20,
+        padding: const EdgeInsets.all(16),
+
+        child: TextField(
+          controller: _textController,
+          maxLines: null,
+          expands: true,
+          style: const TextStyle(
+            fontSize: 16,
+            height: 1.5,
+            color: Color.fromARGB(255, 46, 46, 46), // 🔥 유리 스타일에서는 흰 글씨가 예쁨
+          ),
+          decoration: const InputDecoration(
+            border: InputBorder.none,
+            hintText: "Describe what happened in your dream...",
+            hintStyle: TextStyle(
+              color: Colors.white70,
+              fontStyle: FontStyle.italic,   // 🔥 hint도 어울리게 변경
             ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                GgumButton(
-                  width: 120,
-                  text: "SAVE DRAFT",
-                  onPressed: _saveDraft,
-                ),
-                const SizedBox(width: 12),
-                GgumButton(
-                  width: 120,
-                  text: widget.existingEntry != null ? "UPDATE" : "POST!",
-                  onPressed: _processAndSave,
-                ),
-              ],
-            ),
-          ],
+          ),
+        ),
+      ),
+    ),
+  ),
+),
+
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  GgumButton(
+                    width: 140,
+                    text: "SAVE DRAFT",
+                    onPressed: _saveDraft,
+                  ),
+                  const SizedBox(width: 12),
+                  GgumButton(
+                    width: 120,
+                    text: widget.existingEntry != null ? "UPDATE" : "POST!",
+                    onPressed: _processAndSave,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
