@@ -58,11 +58,16 @@ class MarketRepository {
     await _items.doc(itemId).update({'price': newPrice});
   }
 
-  Future<void> markAsSold(String itemId, {String? buyerId}) async {
-    await _items
-        .doc(itemId)
-        .update({'isSold': true, if (buyerId != null) 'buyerId': buyerId});
+  Future<void> markAsSold(String itemId, {required String buyerId}) async {
+  if (buyerId.isEmpty) {
+    throw StateError('buyerId must not be empty for markAsSold.');
   }
+
+  await _items.doc(itemId).update({
+    'isSold': true,
+    'buyerUid': buyerId, // 🔥 rules에서 보는 필드
+  });
+}
 
   Future<void> deleteListingByDiary(String diaryId) async {
     final existing =
