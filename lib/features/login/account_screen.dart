@@ -9,7 +9,6 @@ import 'auth_repository.dart';
 import '../diary/application/user_provider.dart'; // 코인/닉네임 상태
 import '../diary/application/shop_provider.dart';
 import '../shop/domain/shop_item.dart';
-import '../diary/presentation/shop_detail_screen.dart';
 
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
@@ -45,10 +44,11 @@ class AccountScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('My Account'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 프로필 영역
             Row(
@@ -222,6 +222,11 @@ class AccountScreen extends ConsumerWidget {
                 onPressed: () async {
                   // Firebase + 로컬 로그아웃
                   await ref.read(authStateProvider.notifier).logout();
+                  
+                  // 모든 provider 상태를 명시적으로 새로고침
+                  ref.invalidate(userProvider);
+                  ref.invalidate(shopProvider);
+                  
                   // 로그인 화면으로 이동
                   if (context.mounted) {
                     context.go('/login');
@@ -231,6 +236,7 @@ class AccountScreen extends ConsumerWidget {
               ),
             ),
           ],
+          ),
         ),
       ),
     );

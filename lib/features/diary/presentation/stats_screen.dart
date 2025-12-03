@@ -114,6 +114,9 @@ class StatsScreen extends ConsumerWidget {
                     height: 200,
                     child: LineChart(
                       LineChartData(
+                        // ⚡ Y축 범위 고정 (0~12시간)
+                        minY: 0,
+                        maxY: 15,
                         gridData: const FlGridData(show: false),
                         titlesData: const FlTitlesData(
                           leftTitles: AxisTitles(

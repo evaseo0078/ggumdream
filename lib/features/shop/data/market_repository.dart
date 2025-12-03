@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../diary/domain/diary_entry.dart';
 import '../domain/shop_item.dart';
@@ -14,10 +13,8 @@ class MarketRepository {
       _firestore.collection('market_items');
 
   Stream<List<ShopItem>> watchMarketItems() {
-    return _items
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
+    return _items.orderBy('createdAt', descending: true).snapshots().map(
+        (snapshot) => snapshot.docs
             .map((doc) => ShopItem.fromFirestore(doc.id, doc.data()))
             .toList());
   }
@@ -28,23 +25,18 @@ class MarketRepository {
     required String ownerName,
     required int price,
   }) async {
-    // Debug: Check current user auth
-    final currentUser = FirebaseAuth.instance.currentUser;
-    print('DEBUG - Current user UID: ${currentUser?.uid}');
-    print('DEBUG - ownerId parameter: $ownerId');
-    
     final doc = _items.doc();
     final item = ShopItem(
       id: doc.id,
       diaryId: diary.id,
-      sellerUid: ownerId,
-      ownerName: ownerName,
-      date: diary.date,
       content: diary.content,
-      price: price,
       summary: diary.summary,
       interpretation: diary.interpretation,
+      date: diary.date,
       imageUrl: diary.imageUrl,
+      sellerUid: ownerId,
+      ownerName: ownerName,
+      price: price,
       isSold: false,
       createdAt: DateTime.now(),
     );
@@ -58,16 +50,16 @@ class MarketRepository {
     await _items.doc(itemId).update({'price': newPrice});
   }
 
-  Future<void> markAsSold(String itemId, {required String buyerId}) async {
-  if (buyerId.isEmpty) {
-    throw StateError('buyerId must not be empty for markAsSold.');
+  Future<void> markAsSold(String itemId, {String? buyerId}) async {
+    if (buyerId != null && buyerId.isEmpty) {
+      throw StateError('buyerId must not be empty for markAsSold.');
+    }
+    
+    await _items.doc(itemId).update({
+      'isSold': true,
+      if (buyerId != null) 'buyerUid': buyerId, // 🔥 rules에서 보는 필드
+    });
   }
-
-  await _items.doc(itemId).update({
-    'isSold': true,
-    'buyerUid': buyerId, // 🔥 rules에서 보는 필드
-  });
-}
 
   Future<void> deleteListingByDiary(String diaryId) async {
     final existing =

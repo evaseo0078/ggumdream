@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 
+import 'stats_screen.dart';
+
 import '../../music/presentation/sleep_mode_screen.dart';
 import '../../shop/domain/shop_item.dart';
 import '../application/diary_providers.dart';
@@ -14,7 +16,33 @@ import 'diary_detail_screen.dart';
 import 'diary_editor_screen.dart';
 
 import 'dart:ui';
-import '../../../shared/widgets/glass_card.dart';
+
+// ⚡ 뷰 모드 enum 추가
+enum ViewMode { calendar, list, grid }
+
+Widget glassCard({
+  required Widget child,
+  double radius = 16,
+  double opacity = 0.1,
+}) {
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(radius),
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(opacity),
+          borderRadius: BorderRadius.circular(radius),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.1),
+            width: 2.5,
+          ),
+        ),
+        child: child,
+      ),
+    ),
+  );
+}
 
 class DiaryListScreen extends ConsumerStatefulWidget {
   const DiaryListScreen({super.key});
@@ -24,7 +52,7 @@ class DiaryListScreen extends ConsumerStatefulWidget {
 }
 
 class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
-  bool _isCalendarView = true;
+  ViewMode _viewMode = ViewMode.calendar; // ⚡ enum 사용
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
 
@@ -33,7 +61,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
   @override
   Widget build(BuildContext context) {
     final diaryList = ref.watch(diaryListProvider);
-    final displayList = (_isCalendarView && _selectedDay != null)
+    final displayList = (_viewMode == ViewMode.calendar && _selectedDay != null)
         ? diaryList.where((entry) => isSameDay(entry.date, _selectedDay)).toList()
         : diaryList;
 
@@ -77,13 +105,24 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                       children: [
                         IconButton(
                           icon: Icon(
-                            _isCalendarView ? Icons.format_list_bulleted : Icons.calendar_month,
+                            _viewMode == ViewMode.calendar
+                                ? Icons.format_list_bulleted
+                                : _viewMode == ViewMode.list
+                                    ? Icons.grid_view
+                                    : Icons.calendar_month,
                             color: const Color.fromARGB(221, 255, 255, 255),
                           ),
                           onPressed: () {
                             setState(() {
-                              _isCalendarView = !_isCalendarView;
-                              if (!_isCalendarView) _selectedDay = null;
+                              // Calendar → List → Grid → Calendar 순환
+                              if (_viewMode == ViewMode.calendar) {
+                                _viewMode = ViewMode.list;
+                                _selectedDay = null;
+                              } else if (_viewMode == ViewMode.list) {
+                                _viewMode = ViewMode.grid;
+                              } else {
+                                _viewMode = ViewMode.calendar;
+                              }
                             });
                           },
                         ),
@@ -114,10 +153,10 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                     ),
                   ),
                 ),
-                if (_isCalendarView)
+                if (_viewMode == ViewMode.calendar)
                   SliverToBoxAdapter(
   child: Center(
-    child: GlassCard(
+    child: glassCard(
       radius: 20,
       opacity: 0.23,
       child: Container(
@@ -130,6 +169,11 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
           focusedDay: _focusedDay,
           selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
 
+          // ⚡ eventLoader 추가: 해당 날짜의 일기들을 반환
+          eventLoader: (day) {
+            return diaryList.where((entry) => isSameDay(entry.date, day)).toList();
+          },
+
           onDaySelected: (selectedDay, focusedDay) {
             setState(() {
               if (_selectedDay != null && isSameDay(_selectedDay, selectedDay)) {
@@ -139,6 +183,33 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
               }
               _focusedDay = focusedDay;
             });
+          },
+
+          onPageChanged: (focusedDay) {
+            // 연도 제한 체크
+            if (focusedDay.year < 2023) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Cannot go further back in time.'),
+                  duration: Duration(seconds: 3),
+                ),
+              );
+              // 2023년 1월로 되돌리기
+              setState(() {
+                _focusedDay = DateTime(2023, 1, 1);
+              });
+            } else if (focusedDay.year > 2026) {
+              _showComingSoonDialog(context);
+              // 2026년 12월로 되돌리기
+              setState(() {
+                _focusedDay = DateTime(2026, 12, 31);
+              });
+            } else {
+              // 허용된 범위 내에서만 업데이트
+              setState(() {
+                _focusedDay = focusedDay;
+              });
+            }
           },
 
           headerStyle: const HeaderStyle(
@@ -174,12 +245,30 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
           calendarBuilders: CalendarBuilders(
             markerBuilder: (context, date, events) {
               if (events.isEmpty) return null;
-              final mood = (events.first as DiaryEntry).mood;
+              
+              // ⚡ 해당 날짜의 모든 일기들의 mood 수집
+              final diaryEntries = events.cast<DiaryEntry>();
+              final moods = diaryEntries.map((e) => e.mood).toList();
+              
+              // 최대 2개까지 표시, 그 이상이면 + 추가
+              final displayMoods = moods.take(2).toList();
+              final hasMore = moods.length > 2;
+              
               return Positioned(
                 bottom: 1,
-                child: Text(
-                  mood,
-                  style: const TextStyle(fontSize: 10),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ...displayMoods.map((mood) => Text(
+                      mood,
+                      style: const TextStyle(fontSize: 10),
+                    )),
+                    if (hasMore)
+                      const Text(
+                        '+',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                  ],
                 ),
               );
             },
@@ -197,7 +286,7 @@ const SliverToBoxAdapter(
                     ? SliverFillRemaining(
                         child: Center(
                           child: Text(
-                            _isCalendarView && _selectedDay != null
+                            _viewMode == ViewMode.calendar && _selectedDay != null
                                 ? "No dreams on this day.\nTap + to write!"
                                 : "Let's make your\nfirst post",
                             textAlign: TextAlign.center,
@@ -205,65 +294,121 @@ const SliverToBoxAdapter(
                           ),
                         ),
                       )
-                    : SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            return Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: _buildDiaryCard(context, ref, displayList[index]),
-          ),
-
-          // ⭐ 새로운 공백 (일기 카드들 사이 공간)
-          const SizedBox(height: 10),  // ← 여백 높이 조절 가능
-        ],
-      );
-                          },
-                          childCount: displayList.length,
-                        ),
-                      ),
+                    : _viewMode == ViewMode.grid
+                        ? SliverPadding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            sliver: SliverGrid(
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 3, // ⚡ 가로 3개
+                                crossAxisSpacing: 4,
+                                mainAxisSpacing: 4,
+                                childAspectRatio: 1, // 정사각형
+                              ),
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  return _buildGridItem(context, displayList[index]);
+                                },
+                                childCount: displayList.length,
+                              ),
+                            ),
+                          )
+                        : SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                return Column(
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                                      child: _buildDiaryCard(context, ref, displayList[index]),
+                                    ),
+                                    const SizedBox(height: 10),
+                                  ],
+                                );
+                              },
+                              childCount: displayList.length,
+                            ),
+                          ),
                 const SliverToBoxAdapter(child: SizedBox(height: 80)),
               ],
             ),
           ),
         ],
       ),
-      floatingActionButton: GestureDetector(
-  onTap: () {
-    final dateToWrite = _selectedDay ?? DateTime.now();
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => DiaryEditorScreen(selectedDate: dateToWrite),
-      ),
-    );
-  },
-
-  child: ClipRRect(
-    borderRadius: BorderRadius.circular(50), // 🔥 완전 동그라미
-    child: BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12), // 🔥 유리 흐림 효과
-      child: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white.withOpacity(0.25), // 🔥 유리 반투명
-          border: Border.all(
-            color: Colors.white.withOpacity(0.4),
-            width: 1.5,
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          // 통계 버튼
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const StatsScreen(),
+                ),
+              );
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(50),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.25),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.4),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.analytics,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
-        child: const Icon(
-          Icons.edit,
-          color: Colors.white,
-          size: 28,
-        ),
+          const SizedBox(height: 16),
+          // 작성 버튼
+          GestureDetector(
+            onTap: () {
+              final dateToWrite = _selectedDay ?? DateTime.now();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DiaryEditorScreen(selectedDate: dateToWrite),
+                ),
+              );
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(50),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.25),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.4),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.edit,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
-    ),
-  ),
-),
     );
   }
 
@@ -295,7 +440,7 @@ const SliverToBoxAdapter(
   },
 
   child: Center( // 🔥 가운데 정렬
-    child: GlassCard(
+    child: glassCard(
       radius: 14,
       opacity: 0.22,
       child: Container(
@@ -405,7 +550,7 @@ const SliverToBoxAdapter(
   },
 
   child: Center( // 🔥 가운데 정렬
-    child: GlassCard(
+    child: glassCard(
       radius: 12,
       opacity: 0.20,
       child: Container(
@@ -469,6 +614,90 @@ const SliverToBoxAdapter(
   ),
 );
 
+  }
+
+  /// ⚡ Instagram 피드 스타일 Grid Item
+  Widget _buildGridItem(BuildContext context, DiaryEntry entry) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DiaryDetailScreen(entry: entry),
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[300],
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // 이미지 표시
+            if (entry.imageUrl != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: Image.network(
+                  entry.imageUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.broken_image, color: Colors.grey),
+                    );
+                  },
+                ),
+              )
+            else
+              // 이미지가 없는 경우 기본 아이콘
+              const Center(
+                child: Icon(Icons.image, color: Colors.grey, size: 40),
+              ),
+            
+            // Draft 뱃지 (draft인 경우)
+            if (entry.isDraft)
+              Positioned(
+                top: 4,
+                right: 4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.orange,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    "DRAFT",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            
+            // Mood 이모지 (하단 왼쪽)
+            Positioned(
+              bottom: 4,
+              left: 4,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  entry.mood,
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _handleSellButtonTap(BuildContext context, WidgetRef ref, DiaryEntry entry, bool isSoldOut) async {
@@ -744,6 +973,116 @@ const SliverToBoxAdapter(
               child: const Text("Delete", style: TextStyle(color: Colors.red)),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  void _showComingSoonDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black54,
+      builder: (context) {
+        // 4초 후 자동으로 닫기
+        Future.delayed(const Duration(seconds: 4), () {
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
+        });
+
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 40),
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 20,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 애니메이션 로켓 아이콘
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.5, end: 1.2),
+                    duration: const Duration(milliseconds: 3000),
+                    curve: Curves.elasticOut,
+                    builder: (context, scale, child) {
+                      return Transform.scale(
+                        scale: scale,
+                        child: const Icon(
+                          Icons.rocket_launch,
+                          size: 80,
+                          color: Colors.orange,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // 메인 메시지
+                  const Text(
+                    'Coming Soon!',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  // 서브 메시지
+                  const Text(
+                    'This feature will be available\nin the next version!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  // 기대 메시지
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Stay tuned! ',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.purple,
+                        ),
+                      ),
+                      TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0.8, end: 1.2),
+                        duration: const Duration(seconds: 1),
+                        curve: Curves.easeInOut,
+                        builder: (context, scale, child) {
+                          return Transform.scale(
+                            scale: scale,
+                            child: const Text(
+                              '🌟✨',
+                              style: TextStyle(fontSize: 20),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
         );
       },
     );

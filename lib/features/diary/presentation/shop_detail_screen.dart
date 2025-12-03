@@ -18,7 +18,38 @@ class ShopDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final userState = ref.watch(userProvider);
+    final isOwner = item.sellerUid == userState.userId; // 판매자인지 확인
     final dateText = DateFormat('yyyy.MM.dd').format(item.date);
+
+    // ⚡ 판매된 일기는 접근 불가 (판매자도 접근 불가)
+    if (item.isSold) {
+      return Scaffold(
+        appBar: AppBar(
+          leading: const BackButton(color: Colors.black),
+          title: const Text('Access Denied', style: TextStyle(color: Colors.black)),
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.lock, size: 80, color: Colors.grey),
+              SizedBox(height: 16),
+              Text(
+                'This diary has been sold',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Sold diaries can no longer be accessed.',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -52,7 +83,7 @@ class ShopDetailScreen extends ConsumerWidget {
                       item.imageUrl != null
                           ? Image.network(item.imageUrl!, fit: BoxFit.cover)
                           : const Icon(Icons.image, color: Colors.grey),
-                      if (!isPurchased)
+                      if (!isPurchased && !isOwner)
                         Positioned.fill(
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(8),
@@ -80,18 +111,18 @@ class ShopDetailScreen extends ConsumerWidget {
                     children: [
                       _buildResultBox(
                         "Summary",
-                        isPurchased 
+                        (isPurchased || isOwner) 
                             ? (item.summary ?? "No summary available")
                             : "🔒 Purchase to view summary",
-                        isBlurred: !isPurchased,
+                        isBlurred: !isPurchased && !isOwner,
                       ),
                       const SizedBox(height: 10),
                       _buildResultBox(
                         "Interpretation",
-                        isPurchased 
+                        (isPurchased || isOwner) 
                             ? (item.interpretation ?? "No interpretation available")
                             : "🔒 Purchase to view interpretation",
-                        isBlurred: !isPurchased,
+                        isBlurred: !isPurchased && !isOwner,
                       ),
                     ],
                   ),
@@ -117,7 +148,7 @@ class ShopDetailScreen extends ConsumerWidget {
                     isPurchased ? item.content : item.content,
                     style: const TextStyle(fontSize: 14, height: 1.5),
                   ),
-                  if (!isPurchased)
+                  if (!isPurchased && !isOwner)
                     Positioned.fill(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
@@ -153,7 +184,7 @@ class ShopDetailScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 30),
-            if (!isPurchased && !item.isSold)
+            if (!isPurchased && !item.isSold && !isOwner)
               Center(
                 child: SizedBox(
                   width: 200,
