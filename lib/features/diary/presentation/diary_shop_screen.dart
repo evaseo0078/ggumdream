@@ -28,84 +28,97 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
         : shopItems.where((item) => item.sellerUid != userState.userId).toList();
 
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 211,202,239), // Light sky blue background
-      body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color.fromARGB(255, 211,202,239), // Light blue-gray
-                    Color.fromARGB(200, 172,193,242), // Darker blue-gray
-                  ],
-                ),
-                borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-              ),
-              child: const Text(
-                "GGUM store",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, fontFamily: 'Stencil', color: Colors.white),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      _buildTabButton("Market", !_showMySales),
-                      const SizedBox(width: 10),
-                      _buildTabButton("My Sales", _showMySales),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFE6E6FA), // Light purple
+              Color.fromARGB(255, 168, 152, 255),
+              Color.fromARGB(255, 152, 176, 255) // Dark purple
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                       Color.fromARGB(200, 192, 171, 255),
+                      Color.fromARGB(255, 192, 171, 255), // Light blue-gray
+                      // Darker blue-gray
                     ],
                   ),
-                  Row(
-                    children: [
-                      const CircleAvatar(
-                        radius: 14,
-                        backgroundColor: Colors.deepPurple,
-                        child: Icon(Icons.star, color: Colors.white, size: 16),
-                      ),
-                      const SizedBox(width: 8),
-                      GlassCard(
-                        radius: 12,
-                        opacity: 0.4,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          child: Text(
-                            "${userState.coins}",
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+                ),
+                child: const Text(
+                  "GGUM store",
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, fontFamily: 'Stencil', color: Colors.white),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        _buildTabButton("Market", !_showMySales),
+                        const SizedBox(width: 10),
+                        _buildTabButton("My Sales", _showMySales),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        const CircleAvatar(
+                          radius: 14,
+                          backgroundColor: Colors.deepPurple,
+                          child: Icon(Icons.star, color: Colors.white, size: 16),
+                        ),
+                        const SizedBox(width: 8),
+                        GlassCard(
+                          radius: 12,
+                          opacity: 0.4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            child: Text(
+                              "${userState.coins}",
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple),
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  )
-                ],
-              ),
-            ),
-            Expanded(
-              child: filteredItems.isEmpty
-                  ? Center(
-                      child: Text(
-                        _showMySales
-                            ? "You are not selling any dreams."
-                            : "No items in the market.",
-                        style: const TextStyle(color: Colors.grey),
-                      ),
+                      ],
                     )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: filteredItems.length,
-                      itemBuilder: (context, index) {
-                        return _buildShopItem(context, ref, filteredItems[index], userState.userId);
-                      },
-                    ),
-            ),
-          ],
+                  ],
+                ),
+              ),
+              Expanded(
+                child: filteredItems.isEmpty
+                    ? Center(
+                        child: Text(
+                          _showMySales
+                              ? "You are not selling any dreams."
+                              : "No items in the market.",
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: filteredItems.length,
+                        itemBuilder: (context, index) {
+                          return _buildShopItem(context, ref, filteredItems[index], userState.userId);
+                        },
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -127,7 +140,7 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
             text,
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: isActive ? Colors.black : Colors.grey,
+              color: isActive ? Colors.white : Colors.grey, // Changed active text color to white
             ),
           ),
         ),

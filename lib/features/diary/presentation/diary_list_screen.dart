@@ -325,9 +325,15 @@ const SliverToBoxAdapter(
                 Container(
                   width: 72, // 🔥 조금 더 작게
                   height: 72,
-                  color: Colors.grey[300],
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(12), // Rounded corners for images
+                  ),
                   child: entry.imageUrl != null
-                      ? Image.network(entry.imageUrl!, fit: BoxFit.cover)
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(12), // Match the container's rounded corners
+                          child: Image.network(entry.imageUrl!, fit: BoxFit.cover),
+                        )
                       : const Icon(Icons.image, color: Colors.grey),
                 ),
                 const SizedBox(width: 10),
