@@ -5,10 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../shared/widgets/notebook_background.dart';
 import '../../../shared/widgets/ggum_button.dart';
 import 'auth_repository.dart';
-
 
 class SignupPage extends ConsumerStatefulWidget {
   const SignupPage({super.key});
@@ -147,15 +145,29 @@ class _SignupPageState extends ConsumerState<SignupPage> {
       resizeToAvoidBottomInset: false,
 
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color.fromARGB(255, 255, 237, 253),
         elevation: 0,
-        leading: const BackButton(color: Colors.black),
+        leading: const BackButton(color: Color.fromARGB(255, 216, 169, 255)),
         title: const Text(
           "Make your new Account",
-          style: TextStyle(color: Colors.black54, fontSize: 16),
+          style: TextStyle(color: Color.fromARGB(255, 216, 169, 255), fontSize: 16, fontWeight: FontWeight.bold),
         ),
       ),
-      body: NotebookBackground(
+      body: Container(
+        height: double.infinity, // Ensure the gradient fills the entire screen
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color.fromARGB(255, 255, 237, 253),
+              Color.fromARGB(255, 205, 230, 246),
+              Color.fromARGB(255, 211, 202, 239),
+              Color.fromARGB(255, 142, 124, 232),
+            ],
+            stops: [0.0, 0.5, 0.7, 1.0],
+          ),
+        ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20),
           child: Column(
@@ -166,6 +178,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
               _buildLabel("Name"),
               _buildInput(controller: _nameCtrl),
               const SizedBox(height: 16),
+              
 
               _buildLabel("Nickname"),
               _buildInput(controller: _nicknameCtrl),
@@ -208,7 +221,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
               const SizedBox(height: 40),
 
               GgumButton(
-                text: _isLoading ? "..." : "sign\nup",
+                text: _isLoading ? "..." : "sign up",
                 onPressed: () {
                   if (_isLoading) return;
                   _onSignupPressed();

@@ -35,7 +35,7 @@ class HomeShell extends ConsumerWidget {
           // 탭을 누르면 리모컨 값을 변경합니다
           onTap: (index) => ref.read(homeTabProvider.notifier).state = index,
 
-          backgroundColor: const Color(0xFFAABCC5),
+          backgroundColor: const Color.fromARGB(255, 213, 212, 255),
           selectedItemColor: Colors.black87,
           unselectedItemColor: Colors.black45,
           showSelectedLabels: false,

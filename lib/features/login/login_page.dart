@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import 'auth_provider.dart';
 
+import 'dart:ui';
+
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
 
@@ -64,72 +66,143 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Login'),
-        centerTitle: true,
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 🔹 앱 이름을 중앙에 크게 표시
-              const Text(
-                'GGUMDREAM',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              // 이메일
-              TextField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 16),
-
-              // 비밀번호
-              TextField(
-                controller: _passwordController,
-                decoration: const InputDecoration(
-                  labelText: 'Password',
-                  border: OutlineInputBorder(),
-                ),
-                obscureText: true,
-              ),
-              const SizedBox(height: 24),
-
-              if (authState.error != null)
-                Text(
-                  authState.error!,
-                  style: const TextStyle(color: Colors.red),
-                ),
-
-              const SizedBox(height: 16),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleLogin,
-                  child: _isLoading
-                      ? const CircularProgressIndicator()
-                      : const Text('Login'),
-                ),
-              ),
-
-              TextButton(
-                onPressed: () => context.go('/login/signup'),
-                child: const Text('Sign Up'),
-              ),
-            ],
+        title: const Text(
+          'Login',
+          style: TextStyle(
+            color: Color.fromARGB(255, 255, 255, 255), // Changed title text color
           ),
         ),
+        centerTitle: true,
+        backgroundColor: const Color.fromARGB(255, 73, 149, 255).withOpacity(0.5),
+        elevation: 0,
+      ),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/login_background.jpg',
+              fit: BoxFit.cover,
+              color: const Color.fromARGB(255, 255, 255, 255).withOpacity(0.7), // Adjust transparency here
+              colorBlendMode: BlendMode.darken, // Blend mode for transparency
+            ),
+          ),
+          Positioned(
+            top: 0,
+            right: 10,
+            child: Image.asset(
+              'assets/images/star.png',
+            ),
+          ),
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // 앱 로고
+                SizedBox(
+                  width: 520,
+                  height: 170,
+                  child: Image.asset(
+                    'assets/images/GGUMDREAM_logo_white.png',
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                
+
+                // 이메일
+                SizedBox(
+                  width: 350, // Reduced width
+                  child: TextField(
+                    controller: _emailController,
+                    decoration: InputDecoration(
+                      labelText: 'Email',
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: const Color.fromARGB(255, 175, 126, 255), // Change border color
+                          width: 1.5, // Adjust border width
+                        ),
+                      ),
+                      filled: true, // Enable background color
+                      fillColor: Color.fromARGB(255, 255, 255, 255).withOpacity(0.3), // Set background color
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // 비밀번호
+                SizedBox(
+                  width: 350, // Reduced width
+                  child: TextField(
+                    controller: _passwordController,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      border: const OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: const Color.fromARGB(255, 175, 126, 255), // Change border color
+                          width: 1.5, // Adjust border width
+                        ),
+                      ),
+                      filled: true, // Enable background color
+                      fillColor: const Color.fromARGB(255, 255, 255, 255).withOpacity(0.3), // Set background color
+                    ),
+                    obscureText: true,
+                  ),
+                ),
+                const SizedBox(height: 15),
+
+                if (authState.error != null)
+                  Text(
+                    authState.error!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+
+                const SizedBox(height: 16),
+
+                SizedBox(
+                  width: 350, // Reduced width
+                  child: GestureDetector(
+                    onTap: _isLoading ? null : _handleLogin,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10), // 🔥 유리 흐림 효과
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            color: Colors.white.withOpacity(0.25),        // 🔥 glass 투명도
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.35),
+                              width: 1.4,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: _isLoading
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : const Text(
+                                  'Login',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => context.go('/login/signup'),
+                  child: const Text('Sign Up'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color.fromARGB(255, 107, 107, 107),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
