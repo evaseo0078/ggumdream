@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/diary_repository.dart';
@@ -14,9 +15,20 @@ final llmServiceProvider = Provider<MockLLMService>((ref) => MockLLMService());
 class DiaryListNotifier extends StateNotifier<List<DiaryEntry>> {
   final DiaryRepository _repository;
   StreamSubscription<List<DiaryEntry>>? _subscription;
+  StreamSubscription<User?>? _authSubscription;
 
   DiaryListNotifier(this._repository) : super([]) {
-    _listenToDiaries();
+    // Firebase Auth 상태 변화를 감지하여 다이어리 데이터 로드
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user != null) {
+        print('🔐 User logged in, loading diaries...');
+        _listenToDiaries();
+      } else {
+        print('🚪 User logged out, clearing diaries...');
+        _subscription?.cancel();
+        state = [];
+      }
+    });
   }
 
   void _listenToDiaries() {
@@ -54,6 +66,7 @@ class DiaryListNotifier extends StateNotifier<List<DiaryEntry>> {
   @override
   void dispose() {
     _subscription?.cancel();
+    _authSubscription?.cancel();
     super.dispose();
   }
 }

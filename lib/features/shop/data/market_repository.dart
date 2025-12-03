@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../diary/domain/diary_entry.dart';
 import '../domain/shop_item.dart';
@@ -26,23 +25,18 @@ class MarketRepository {
     required String ownerName,
     required int price,
   }) async {
-    // Debug: Check current user auth
-    final currentUser = FirebaseAuth.instance.currentUser;
-    print('DEBUG - Current user UID: ${currentUser?.uid}');
-    print('DEBUG - ownerId parameter: $ownerId');
-    
     final doc = _items.doc();
     final item = ShopItem(
       id: doc.id,
       diaryId: diary.id,
-      sellerUid: ownerId,
-      ownerName: ownerName,
-      date: diary.date,
       content: diary.content,
-      price: price,
       summary: diary.summary,
       interpretation: diary.interpretation,
+      date: diary.date,
       imageUrl: diary.imageUrl,
+      sellerUid: ownerId,
+      ownerName: ownerName,
+      price: price,
       isSold: false,
       createdAt: DateTime.now(),
     );
@@ -57,9 +51,13 @@ class MarketRepository {
   }
 
   Future<void> markAsSold(String itemId, {String? buyerId}) async {
+    if (buyerId != null && buyerId.isEmpty) {
+      throw StateError('buyerId must not be empty for markAsSold.');
+    }
+    
     await _items.doc(itemId).update({
       'isSold': true,
-      if (buyerId != null) 'buyerUid': buyerId,
+      if (buyerId != null) 'buyerUid': buyerId, // 🔥 rules에서 보는 필드
     });
   }
 

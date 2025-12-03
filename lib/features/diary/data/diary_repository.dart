@@ -2,10 +2,15 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
 
 import '../domain/diary_entry.dart';
+import 'package:ggumdream/services/pollinations_proxy_service.dart';
 
+/// ---------------------------------------------------------------------------
+/// 1. 일기 리포지토리 (Firestore)
+/// ---------------------------------------------------------------------------
 class DiaryRepository {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
@@ -78,116 +83,104 @@ class DiaryRepository {
   }
 }
 
-// 2. LLM Mock Service (with optional real API)
+/// ---------------------------------------------------------------------------
+/// 2. LLM 서비스 (Pollinations → Cloud Functions 경유 + Gemini 분석)
+/// ---------------------------------------------------------------------------
 class MockLLMService {
-  final String apiKey;
+  final String _apiKey = dotenv.env['GEMINI_API_KEY'] ?? "";
 
-  MockLLMService({String? apiKey})
-      : apiKey = apiKey ?? const String.fromEnvironment('OPENAI_API_KEY');
-
-  bool get _hasApiKey => apiKey.isNotEmpty && apiKey.startsWith('sk-');
-
+  // -------------------------------------------------------------------------
+  // 1) 이미지 생성
+  //  - Flutter 앱 → Cloud Functions(generateImageFromPollinations)
+  //  - Functions가 Pollinations 호출 + Firebase Storage에 저장
+  //  - 여기서는 Storage 이미지 URL을 그대로 리턴
+  // -------------------------------------------------------------------------
   Future<String> generateImage(String prompt) async {
-    if (!_hasApiKey) {
-      await Future.delayed(const Duration(milliseconds: 500));
-      return 'https://picsum.photos/seed/${Uri.encodeComponent(prompt)}/300/300';
-    }
-
-    final url = Uri.parse('https://api.openai.com/v1/images/generations');
     try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: jsonEncode({
-          'model': 'gpt-image-1',
-          'prompt': 'A warm, dreamy illustration of: $prompt',
-          'n': 1,
-          'size': '1024x1024',
-        }),
-      );
+      // 프롬프트 조금 꾸며서 전달 (취향대로 바꿔도 됨)
+      final refinedPrompt = "dreamy watercolor painting of $prompt";
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final list = data['data'] as List<dynamic>;
-        return list.first['url'] as String;
-      }
-    } catch (_) {
-      // swallow errors and fall back
+      // 서버 우회 호출 (직접 Pollinations를 부르지 않음)
+      final imageUrl =
+          await PollinationsProxyService.generateImage(refinedPrompt);
+
+      return imageUrl; // Firebase Storage의 HTTPS 이미지 URL
+    } catch (e) {
+      print("이미지 생성 오류 (서버 우회 방식): $e");
+      // 완전히 실패하면 대체 이미지
+      return "https://picsum.photos/300/300?error=proxy_fail";
     }
-
-    return 'https://picsum.photos/seed/${Uri.encodeComponent(prompt)}/300/300';
   }
 
+  // -------------------------------------------------------------------------
+  // 2) 꿈 분석 (Gemini API 사용) – 기존 로직 그대로
+  // -------------------------------------------------------------------------
   Future<Map<String, String>> analyzeDream(String content) async {
-    if (!_hasApiKey) {
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      String mood = '🙂';
-      final lower = content.toLowerCase();
-      if (lower.contains('happy') || lower.contains('good')) {
-        mood = '😄';
-      } else if (lower.contains('scary') || lower.contains('ghost')) {
-        mood = '😨';
-      } else if (lower.contains('sad') || lower.contains('cry')) {
-        mood = '😢';
-      }
-
+    if (_apiKey.isEmpty) {
+      await Future.delayed(const Duration(seconds: 1));
       return {
-        'summary': 'Summary of: $content (mock)',
-        'interpretation':
-            'This dream reflects your subconscious feelings. (mock)',
-        'mood': mood,
+        "summary": "API Key 없음",
+        "interpretation": ".env 파일을 확인해주세요.",
+        "mood": "🌿",
       };
     }
 
-    final url = Uri.parse('https://api.openai.com/v1/chat/completions');
     try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: jsonEncode({
-          'model': 'gpt-4o-mini',
-          'messages': [
-            {
-              'role': 'system',
-              'content':
-                  'Return a JSON object with keys summary, interpretation, and mood (emoji) describing the dream.',
-            },
-            {'role': 'user', 'content': content},
-          ],
-          'response_format': {'type': 'json_object'},
-        }),
+      final model = GenerativeModel(
+        model: 'gemini-2.5-flash',
+        apiKey: _apiKey,
       );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(response.bodyBytes))
-            as Map<String, dynamic>;
-        final contentString =
-            (data['choices'] as List<dynamic>).first['message']['content']
-                as String;
-        final contentJson = jsonDecode(contentString) as Map<String, dynamic>;
+      final systemPrompt = """
+        You are a dream interpreter. Analyze the user's dream.
+        Respond with a valid JSON object ONLY.
+        JSON format:
+        {
+          "summary": "English summary (1 sentence)",
+          "interpretation": "English interpretation (warm tone, 2 sentences)",
+          "mood": "1 emoji"
+        }
+      """;
 
+      final response = await model.generateContent([
+        Content.text("$systemPrompt\n\nUser's Dream: $content")
+      ]);
+
+      print("Gemini 응답 원본: ${response.text}");
+
+      String contentString = response.text ?? "";
+      // 마크다운(```json ``` ) 제거
+      contentString = contentString
+          .replaceAll(RegExp(r'```json'), '')
+          .replaceAll(RegExp(r'```'), '')
+          .trim();
+
+      Map<String, dynamic>? contentJson;
+      try {
+        contentJson = jsonDecode(contentString);
+      } catch (e) {
+        print("Gemini 응답 파싱 실패: $contentString");
         return {
-          'summary': contentJson['summary'] as String? ?? 'No summary',
-          'interpretation':
-              contentJson['interpretation'] as String? ?? 'No interpretation',
-          'mood': contentJson['mood'] as String? ?? '🙂',
+          "summary": "분석 결과를 이해할 수 없습니다.",
+          "interpretation": "AI 응답이 올바른 JSON이 아닙니다.",
+          "mood": "❓",
         };
       }
-    } catch (_) {
-      // swallow and fallback
-    }
 
-    return {
-      'summary': 'Analysis failed',
-      'interpretation': 'Could not connect to AI service.',
-      'mood': '😴',
-    };
+      return {
+        "summary": contentJson?['summary']?.toString() ?? "요약 실패",
+        "interpretation":
+            contentJson?['interpretation']?.toString() ?? "해석 실패",
+        "mood": contentJson?['mood']?.toString() ?? "❓",
+      };
+    } catch (e) {
+      print("Gemini 분석 오류: $e");
+      print("입력값: $content");
+      return {
+        "summary": "분석에 실패했어요",
+        "interpretation": "잠시 후 다시 시도해주세요.",
+        "mood": "⚠️",
+      };
+    }
   }
 }

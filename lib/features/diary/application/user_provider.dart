@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,6 +56,7 @@ class UserState {
 class UserNotifier extends StateNotifier<UserState> {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
+  StreamSubscription<User?>? _authSubscription;
 
   UserNotifier({
     FirebaseFirestore? firestore,
@@ -61,18 +64,30 @@ class UserNotifier extends StateNotifier<UserState> {
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
         _auth = auth ?? FirebaseAuth.instance,
         super(UserState.initial()) {
-    _loadUser();
+    // Firebase Auth 상태 변화를 감지
+    _authSubscription = _auth.authStateChanges().listen((user) {
+      if (mounted) {
+        if (user != null) {
+          _loadUser();
+        } else {
+          // 로그아웃 시 상태 초기화
+          state = UserState.initial();
+        }
+      }
+    });
   }
 
   CollectionReference<Map<String, dynamic>> get _users =>
       _firestore.collection('users');
 
   Future<void> _loadUser() async {
+    if (!mounted) return;
+    
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
 
     final doc = await _users.doc(uid).get();
-    if (doc.exists) {
+    if (doc.exists && mounted) {
       state = UserState.fromFirestore(uid, doc.data()!);
     }
   }
@@ -184,6 +199,12 @@ class UserNotifier extends StateNotifier<UserState> {
       'coins': state.coins,
       // Note: purchaseHistory and salesHistory could be stored in Firestore if needed
     }, SetOptions(merge: true));
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 }
 
