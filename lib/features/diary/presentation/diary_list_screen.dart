@@ -295,7 +295,7 @@ const SliverToBoxAdapter(
   },
 
   child: Center( // 🔥 가운데 정렬
-    child: glassCard(
+    child: GlassCard(
       radius: 14,
       opacity: 0.22,
       child: Container(
@@ -399,7 +399,7 @@ const SliverToBoxAdapter(
   },
 
   child: Center( // 🔥 가운데 정렬
-    child: glassCard(
+    child: GlassCard(
       radius: 12,
       opacity: 0.20,
       child: Container(
