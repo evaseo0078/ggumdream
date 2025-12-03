@@ -44,7 +44,6 @@ Widget glassCard({
   );
 }
 
-
 class DiaryListScreen extends ConsumerStatefulWidget {
   const DiaryListScreen({super.key});
 
@@ -225,10 +224,9 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             rightChevronPadding: EdgeInsets.zero,
           ),
 
-          // ⭐️ rowHeight 대신 padding/margin 축소로 크기 줄이기
           calendarStyle: const CalendarStyle(
-            cellMargin: EdgeInsets.all(0),      // 셀 사이 마진 완전 제거
-            cellPadding: EdgeInsets.all(2),     // 셀 패딩 작게
+            cellMargin: EdgeInsets.all(0),
+            cellPadding: EdgeInsets.all(2),
             todayDecoration: BoxDecoration(
               color: Color.fromARGB(255, 213, 215, 216),
               shape: BoxShape.circle,
@@ -236,7 +234,6 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             selectedDecoration: BoxDecoration(
               color: Color.fromARGB(255, 183, 150, 240),
               shape: BoxShape.circle,
-              
             ),
           ),
 
