@@ -94,9 +94,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             ),
           ),
           Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
                 // 앱 로고
                 SizedBox(
                   width: 520,
@@ -199,7 +200,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     foregroundColor: const Color.fromARGB(255, 107, 107, 107),
                   ),
                 ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

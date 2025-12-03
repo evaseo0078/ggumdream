@@ -10,6 +10,7 @@ import '../diary/application/user_provider.dart'; // 코인/닉네임 상태
 import '../diary/application/shop_provider.dart';
 import '../shop/domain/shop_item.dart';
 import '../diary/presentation/shop_detail_screen.dart';
+import '../diary/presentation/stats_screen.dart';
 
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
@@ -127,6 +128,38 @@ class AccountScreen extends ConsumerWidget {
                   ),
                 ),
               ],
+            ),
+
+            const SizedBox(height: 24),
+
+            // 통계 보기 버튼
+            Container(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const StatsScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.analytics, color: Colors.white),
+                label: const Text(
+                  '나의 꿈 통계 보기',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
             ),
 
             const SizedBox(height: 32),

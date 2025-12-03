@@ -14,10 +14,8 @@ class MarketRepository {
       _firestore.collection('market_items');
 
   Stream<List<ShopItem>> watchMarketItems() {
-    return _items
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
+    return _items.orderBy('createdAt', descending: true).snapshots().map(
+        (snapshot) => snapshot.docs
             .map((doc) => ShopItem.fromFirestore(doc.id, doc.data()))
             .toList());
   }
@@ -59,9 +57,10 @@ class MarketRepository {
   }
 
   Future<void> markAsSold(String itemId, {String? buyerId}) async {
-    await _items
-        .doc(itemId)
-        .update({'isSold': true, if (buyerId != null) 'buyerId': buyerId});
+    await _items.doc(itemId).update({
+      'isSold': true,
+      if (buyerId != null) 'buyerUid': buyerId,
+    });
   }
 
   Future<void> deleteListingByDiary(String diaryId) async {
