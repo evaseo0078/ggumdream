@@ -14,31 +14,7 @@ import 'diary_detail_screen.dart';
 import 'diary_editor_screen.dart';
 
 import 'dart:ui';
-
-Widget glassCard({
-  required Widget child,
-  double radius = 16,
-  double opacity = 0.1,
-}) {
-  return ClipRRect(
-    borderRadius: BorderRadius.circular(radius),
-    child: BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(opacity),
-          borderRadius: BorderRadius.circular(radius),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.1),
-            width: 2.5,
-          ),
-        ),
-        child: child,
-      ),
-    ),
-  );
-}
-
+import '../../../shared/widgets/glass_card.dart';
 
 class DiaryListScreen extends ConsumerStatefulWidget {
   const DiaryListScreen({super.key});
@@ -141,7 +117,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                 if (_isCalendarView)
                   SliverToBoxAdapter(
   child: Center(
-    child: glassCard(
+    child: GlassCard(
       radius: 20,
       opacity: 0.23,
       child: Container(
@@ -177,10 +153,9 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             rightChevronPadding: EdgeInsets.zero,
           ),
 
-          // ⭐️ rowHeight 대신 padding/margin 축소로 크기 줄이기
           calendarStyle: const CalendarStyle(
-            cellMargin: EdgeInsets.all(0),      // 셀 사이 마진 완전 제거
-            cellPadding: EdgeInsets.all(2),     // 셀 패딩 작게
+            cellMargin: EdgeInsets.all(0),
+            cellPadding: EdgeInsets.all(2),
             todayDecoration: BoxDecoration(
               color: Color.fromARGB(255, 213, 215, 216),
               shape: BoxShape.circle,
@@ -188,7 +163,6 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             selectedDecoration: BoxDecoration(
               color: Color.fromARGB(255, 183, 150, 240),
               shape: BoxShape.circle,
-              
             ),
           ),
 

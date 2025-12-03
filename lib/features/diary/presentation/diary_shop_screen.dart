@@ -35,7 +35,14 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
               padding: const EdgeInsets.symmetric(vertical: 20),
               alignment: Alignment.center,
               decoration: const BoxDecoration(
-                color: Color(0xFFAABCC5),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0xFFAABCC5), // Light blue-gray
+                    Color(0xFF6A8FA5), // Darker blue-gray
+                  ],
+                ),
                 borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
               ),
               child: const Text(
