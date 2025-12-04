@@ -9,6 +9,19 @@ import '../domain/diary_entry.dart';
 import 'package:ggumdream/services/pollinations_proxy_service.dart';
 
 /// ---------------------------------------------------------------------------
+/// 0. Gemini mood 카테고리 → 이모지 매핑
+/// ---------------------------------------------------------------------------
+const Map<String, String> _moodEmojiMap = {
+  'joy': '😀',
+  'sadness': '😢',
+  'anger': '😡',
+  'fear': '😱',
+  'love': '🥰',
+  'calm': '😌',
+  'confused': '🤔',
+};
+
+/// ---------------------------------------------------------------------------
 /// 1. 일기 리포지토리 (Firestore)
 /// ---------------------------------------------------------------------------
 class DiaryRepository {
@@ -113,7 +126,9 @@ class MockLLMService {
   }
 
   // -------------------------------------------------------------------------
-  // 2) 꿈 분석 (Gemini API 사용) – 기존 로직 그대로
+  // 2) 꿈 분석 (Gemini API 사용)
+  //    - Gemini는 mood_category (joy/sadness/...)만 고르고
+  //    - 앱에서 _moodEmojiMap으로 이모지로 변환
   // -------------------------------------------------------------------------
   Future<Map<String, String>> analyzeDream(String content) async {
     if (_apiKey.isEmpty) {
@@ -121,7 +136,8 @@ class MockLLMService {
       return {
         "summary": "API Key 없음",
         "interpretation": ".env 파일을 확인해주세요.",
-        "mood": "🌿",
+        // 카테고리를 못 쓰는 상황이니 대충 'confused' 느낌 이모지 사용
+        "mood": _moodEmojiMap['confused'] ?? '🤔',
       };
     }
 
@@ -132,15 +148,21 @@ class MockLLMService {
       );
 
       final systemPrompt = """
-        You are a dream interpreter. Analyze the user's dream.
-        Respond with a valid JSON object ONLY.
-        JSON format:
-        {
-          "summary": "English summary (1 sentence)",
-          "interpretation": "English interpretation (warm tone, 2 sentences)",
-          "mood": "1 emoji"
-        }
-      """;
+You are a dream interpreter. Analyze the user's dream.
+
+Respond with a valid JSON object ONLY.
+Do NOT include any extra text before or after the JSON.
+
+The mood_category must be exactly ONE of:
+"joy", "sadness", "anger", "fear", "love", "calm", "confused".
+
+JSON format:
+{
+  "summary": "English summary (1 sentence)",
+  "interpretation": "English interpretation (warm tone, 2 sentences)",
+  "mood_category": "one of: joy | sadness | anger | fear | love | calm | confused"
+}
+""";
 
       final response = await model.generateContent([
         Content.text("$systemPrompt\n\nUser's Dream: $content")
@@ -149,10 +171,11 @@ class MockLLMService {
       print("Gemini 응답 원본: ${response.text}");
 
       String contentString = response.text ?? "";
+
       // 마크다운(```json ``` ) 제거
       contentString = contentString
-          .replaceAll(RegExp(r'```json'), '')
-          .replaceAll(RegExp(r'```'), '')
+          .replaceAll(RegExp(r'```json', multiLine: true), '')
+          .replaceAll(RegExp(r'```', multiLine: true), '')
           .trim();
 
       Map<String, dynamic>? contentJson;
@@ -163,23 +186,43 @@ class MockLLMService {
         return {
           "summary": "분석 결과를 이해할 수 없습니다.",
           "interpretation": "AI 응답이 올바른 JSON이 아닙니다.",
-          "mood": "❓",
+          "mood": _moodEmojiMap['confused'] ?? '🤔',
         };
       }
 
+
+      // ---------------------------
+      // 1) 안전하게 값 꺼내기
+      // ---------------------------
+      final summary =
+          contentJson?['summary']?.toString() ?? "요약 실패";
+
+      final interpretation =
+          contentJson?['interpretation']?.toString() ?? "해석 실패";
+
+      final rawCategory = (
+              contentJson?['mood_category']?.toString() ?? ''
+            )
+            .toLowerCase()
+            .trim();
+
+      // 2) 카테고리를 이모지로 매핑 (없으면 confused 이모지)
+      final moodEmoji =
+          _moodEmojiMap[rawCategory] ?? _moodEmojiMap['confused'] ?? '🤔';
+
       return {
-        "summary": contentJson?['summary']?.toString() ?? "요약 실패",
-        "interpretation":
-            contentJson?['interpretation']?.toString() ?? "해석 실패",
-        "mood": contentJson?['mood']?.toString() ?? "❓",
+        "summary": summary,
+        "interpretation": interpretation,
+        "mood": moodEmoji,
       };
+
     } catch (e) {
       print("Gemini 분석 오류: $e");
       print("입력값: $content");
       return {
         "summary": "분석에 실패했어요",
         "interpretation": "잠시 후 다시 시도해주세요.",
-        "mood": "⚠️",
+        "mood": _moodEmojiMap['confused'] ?? '🤔',
       };
     }
   }

@@ -20,10 +20,11 @@ class ShopDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final userState = ref.watch(userProvider);
     final isOwner = item.sellerUid == userState.userId; // 판매자인지 확인
+    final isPurchasedByMe = item.buyerUid == userState.userId; // ⚡ 구매자인지 확인
     final dateText = DateFormat('yyyy.MM.dd').format(item.date);
 
-    // ⚡ 판매된 일기는 접근 불가 (판매자도 접근 불가)
-    if (item.isSold) {
+    // ⚡ 판매된 일기는 접근 불가 (단, 구매자는 접근 가능)
+    if (item.isSold && !isPurchasedByMe) {
       return Scaffold(
         appBar: AppBar(
           leading: const BackButton(color: Colors.black),
@@ -83,7 +84,7 @@ class ShopDetailScreen extends ConsumerWidget {
                       item.imageUrl != null
                           ? Image.network(item.imageUrl!, fit: BoxFit.cover)
                           : const Icon(Icons.image, color: Colors.grey),
-                      if (!isPurchased && !isOwner)
+                      if (!isPurchased && !isOwner && !isPurchasedByMe)
                         Positioned.fill(
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(8),
@@ -111,18 +112,18 @@ class ShopDetailScreen extends ConsumerWidget {
                     children: [
                       _buildResultBox(
                         "Summary",
-                        (isPurchased || isOwner) 
+                        (isPurchased || isOwner || isPurchasedByMe) 
                             ? (item.summary ?? "No summary available")
                             : "🔒 Purchase to view summary",
-                        isBlurred: !isPurchased && !isOwner,
+                        isBlurred: !isPurchased && !isOwner && !isPurchasedByMe,
                       ),
                       const SizedBox(height: 10),
                       _buildResultBox(
                         "Interpretation",
-                        (isPurchased || isOwner) 
+                        (isPurchased || isOwner || isPurchasedByMe) 
                             ? (item.interpretation ?? "No interpretation available")
                             : "🔒 Purchase to view interpretation",
-                        isBlurred: !isPurchased && !isOwner,
+                        isBlurred: !isPurchased && !isOwner && !isPurchasedByMe,
                       ),
                     ],
                   ),
@@ -148,7 +149,7 @@ class ShopDetailScreen extends ConsumerWidget {
                     isPurchased ? item.content : item.content,
                     style: const TextStyle(fontSize: 14, height: 1.5),
                   ),
-                  if (!isPurchased && !isOwner)
+                  if (!isPurchased && !isOwner && !isPurchasedByMe)
                     Positioned.fill(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
@@ -184,7 +185,7 @@ class ShopDetailScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 30),
-            if (!isPurchased && !item.isSold && !isOwner)
+            if (!isPurchased && !item.isSold && !isOwner && !isPurchasedByMe)
               Center(
                 child: SizedBox(
                   width: 200,
