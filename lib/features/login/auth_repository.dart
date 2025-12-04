@@ -145,6 +145,47 @@ class AuthRepository {
   }
 
   // =========================================
+  // 🔄 재인증 (비밀번호 변경 전 필수)
+  // =========================================
+  Future<void> reauthenticate({
+    required String email,
+    required String password,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('No user found');
+
+    final cred = EmailAuthProvider.credential(
+      email: email,
+      password: password,
+    );
+    await user.reauthenticateWithCredential(cred);
+  }
+
+  // =========================================
+  // 🔐 비밀번호 변경 (로컬 저장소 업데이트 포함)
+  // =========================================
+  Future<void> updatePassword(String newPassword) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('No user found');
+
+    await user.updatePassword(newPassword);
+
+    final email = user.email;
+    if (email != null && email.isNotEmpty) {
+      await saveCredentials(email, newPassword);
+    }
+  }
+
+  // =========================================
+  // 📝 Firestore 닉네임 업데이트
+  // =========================================
+  Future<void> updateNickname(String uid, String newNickname) async {
+    await _db.collection('users').doc(uid).update({
+      'nickname': newNickname,
+    });
+  }
+
+  // =========================================
   // 로그아웃 & 로컬 저장 관리
   // =========================================
   Future<void> signOut() async {
