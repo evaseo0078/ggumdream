@@ -6,6 +6,7 @@ import '../../shop/domain/shop_item.dart';
 import '../application/shop_provider.dart';
 import '../application/user_provider.dart';
 import 'shop_detail_screen.dart';
+import 'user_dreams_grid_screen.dart'; // ⚡ import 추가
 
 class DiaryShopScreen extends ConsumerStatefulWidget {
   const DiaryShopScreen({super.key});
@@ -22,9 +23,19 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
     final userState = ref.watch(userProvider);
     final shopItems = ref.watch(shopProvider);
 
+    // ⚡ 필터링 후 정렬: 판매 안된 일기 먼저, 판매된 일기 나중에
     final filteredItems = _showMySales
         ? shopItems.where((item) => item.sellerUid == userState.userId).toList()
         : shopItems.where((item) => item.sellerUid != userState.userId).toList();
+    
+    // 정렬: isSold=false 가 먼저, isSold=true 가 나중에
+    filteredItems.sort((a, b) {
+      if (a.isSold == b.isSold) {
+        // 같은 상태면 생성 시간 역순 (최신순)
+        return (b.createdAt ?? DateTime.now()).compareTo(a.createdAt ?? DateTime.now());
+      }
+      return a.isSold ? 1 : -1; // false(0) < true(1), 즉 판매 안된 것 먼저
+    });
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -167,9 +178,33 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                       dateText,
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                     ),
-                    Text(
-                      "Owner: ${item.ownerName}",
-                      style: const TextStyle(fontSize: 10, color: Colors.grey),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => UserDreamsGridScreen(
+                              ownerName: item.ownerName,
+                              sellerUid: item.sellerUid,
+                            ),
+                          ),
+                        );
+                      },
+                      child: RichText(
+                        text: TextSpan(
+                          style: const TextStyle(fontSize: 13, color: Colors.grey),
+                          children: [
+                            const TextSpan(text: "Owner: "),
+                            TextSpan(
+                              text: item.ownerName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),

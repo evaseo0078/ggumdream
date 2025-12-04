@@ -8,6 +8,7 @@ import 'auth_provider.dart';
 import 'auth_repository.dart';
 import '../diary/application/user_provider.dart'; // 코인/닉네임 상태
 import '../diary/application/shop_provider.dart';
+import '../diary/presentation/shop_detail_screen.dart'; // ⚡ import 추가
 import '../shop/domain/shop_item.dart';
 
 class AccountScreen extends ConsumerWidget {
@@ -243,83 +244,103 @@ class AccountScreen extends ConsumerWidget {
   }
 
   Widget _buildPurchaseItem(BuildContext context, ShopItem item) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.green[50],
-        border: Border.all(color: Colors.green[200]!),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.shopping_bag, size: 16, color: Colors.green),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.summary ?? item.content,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  "by ${item.ownerName}",
-                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                ),
-              ],
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ShopDetailScreen(item: item, isPurchased: true),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.green[50],
+          border: Border.all(color: Colors.green[200]!),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.shopping_bag, size: 16, color: Colors.green),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.summary ?? item.content,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    "by ${item.ownerName}",
+                    style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Text(
-            "${item.price}c",
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green),
-          ),
-        ],
+            Text(
+              "${item.price}c",
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildSellingItem(BuildContext context, ShopItem item) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.orange[50],
-        border: Border.all(color: Colors.orange[200]!),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.sell, size: 16, color: Colors.orange),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.summary ?? item.content,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  "판매 중",
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.orange[700],
-                    fontWeight: FontWeight.w500,
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ShopDetailScreen(item: item, isPurchased: false),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.orange[50],
+          border: Border.all(color: Colors.orange[200]!),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.sell, size: 16, color: Colors.orange),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.summary ?? item.content,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                  Text(
+                    "판매 중",
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.orange[700],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Text(
-            "${item.price}c",
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
-          ),
-        ],
+            Text(
+              "${item.price}c",
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
+            ),
+          ],
+        ),
       ),
     );
   }
