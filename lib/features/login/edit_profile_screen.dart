@@ -30,6 +30,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   bool _isLoading = false;
   int _currentImageIndex = 1; // 현재 프로필 이미지 인덱스
+  bool _isCurrentVerified = false; // current password verified state
+  String? _currentPasswordError; // error under Current Password
+  String? _newPasswordError; // error under New/Confirm when blocked
 
   @override
   void initState() {
@@ -143,20 +146,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("변경 사항 저장"),
-        content: const Text("프로필 정보를 정말로 수정하시겠습니까?"),
+        title: const Text("Save Changes"),
+        content: const Text("Do you want to update your profile?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context), // 취소
-            child: const Text("취소", style: TextStyle(color: Colors.grey)),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context); // 팝업 닫고
               _saveProfile(); // 실제 저장 로직 실행
             },
-            child:
-                const Text("확인", style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text("Confirm",
+                style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -208,14 +211,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("프로필이 성공적으로 업데이트되었습니다.")),
+          const SnackBar(content: Text("Profile updated successfully.")),
         );
         Navigator.pop(context); // 화면 닫기
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("오류 발생: $e")),
+          SnackBar(content: Text("Error: $e")),
         );
       }
     } finally {
@@ -295,19 +298,107 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
-              child: const Text("비밀번호를 변경하려면 현재 비밀번호를 입력하세요.",
-                  style: TextStyle(color: Colors.grey, fontSize: 12)),
+              child: const Text(
+                "Enter your current password to change it.",
+                style: TextStyle(color: Colors.grey, fontSize: 12),
+              ),
             ),
             const SizedBox(height: 16),
 
-            _buildPasswordField(
-              label: "Current Password",
-              controller: _currentPasswordController,
-              isVisible: _isCurrentPasswordVisible,
-              onToggleVisibility: () {
-                setState(() =>
-                    _isCurrentPasswordVisible = !_isCurrentPasswordVisible);
-              },
+            // Current Password with Verify button and error text
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Current Password",
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _currentPasswordController,
+                        obscureText: !_isCurrentPasswordVisible,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _isCurrentPasswordVisible
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                              color: Colors.grey,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _isCurrentPasswordVisible =
+                                    !_isCurrentPasswordVisible;
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    OutlinedButton(
+                      onPressed: () async {
+                        setState(() {
+                          _currentPasswordError = null;
+                          _newPasswordError = null;
+                        });
+                        try {
+                          final authRepo = ref.read(authRepositoryProvider);
+                          final email = _emailController.text.trim();
+                          final password =
+                              _currentPasswordController.text.trim();
+                          await authRepo.reauthenticate(
+                              email: email, password: password);
+                          if (mounted) {
+                            setState(() {
+                              _isCurrentVerified = true;
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('Current password verified.')),
+                            );
+                          }
+                        } catch (_) {
+                          if (mounted) {
+                            setState(() {
+                              _isCurrentVerified = false;
+                              _currentPasswordError =
+                                  'Incorrect password. Please try again.';
+                            });
+                          }
+                        }
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.black,
+                        side: const BorderSide(color: Colors.grey),
+                      ),
+                      child: const Text('Verify'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (_currentPasswordError != null)
+                  Text(
+                    _currentPasswordError!,
+                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                  )
+                else if (_isCurrentVerified)
+                  const Text(
+                    'Verified',
+                    style: TextStyle(color: Colors.green, fontSize: 12),
+                  ),
+              ],
             ),
             const SizedBox(height: 16),
 
@@ -315,6 +406,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               label: "New Password",
               controller: _newPasswordController,
               isVisible: _isNewPasswordVisible,
+              readOnly: !_isCurrentVerified,
+              onTap: () {
+                if (!_isCurrentVerified) {
+                  setState(() {
+                    _newPasswordError =
+                        'Please verify your current password first.';
+                  });
+                }
+              },
+              errorText: _newPasswordError,
               onToggleVisibility: () {
                 setState(() => _isNewPasswordVisible = !_isNewPasswordVisible);
               },
@@ -325,6 +426,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               label: "Confirm New Password",
               controller: _confirmPasswordController,
               isVisible: _isConfirmPasswordVisible,
+              readOnly: !_isCurrentVerified,
+              onTap: () {
+                if (!_isCurrentVerified) {
+                  setState(() {
+                    _newPasswordError =
+                        'Please verify your current password first.';
+                  });
+                }
+              },
               onToggleVisibility: () {
                 setState(() =>
                     _isConfirmPasswordVisible = !_isConfirmPasswordVisible);
@@ -395,6 +505,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     required TextEditingController controller,
     required bool isVisible,
     required VoidCallback onToggleVisibility,
+    bool readOnly = false,
+    VoidCallback? onTap,
+    String? errorText,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -404,6 +517,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         TextField(
           controller: controller,
           obscureText: !isVisible,
+          readOnly: readOnly,
+          onTap: onTap,
           decoration: InputDecoration(
             filled: true,
             fillColor: Colors.white,
@@ -424,6 +539,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             ),
           ),
         ),
+        if (errorText != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            errorText,
+            style: const TextStyle(color: Colors.red, fontSize: 12),
+          ),
+        ],
       ],
     );
   }
