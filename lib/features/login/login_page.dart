@@ -78,8 +78,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             const Color.fromARGB(255, 73, 149, 255).withOpacity(0.5),
         elevation: 0,
       ),
-      body: Stack(
-        children: [
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(), // ⚡ 화면 탭 시 키보드 내리기
+        child: Stack(
+          children: [
           Positioned.fill(
             child: Image.asset(
               'assets/images/login_background.jpg',
@@ -227,6 +229,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

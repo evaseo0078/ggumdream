@@ -187,10 +187,12 @@ class _SignupPageState extends ConsumerState<SignupPage> {
           ),
         ),
       ),
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(), // ⚡ 화면 탭 시 키보드 내리기
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -339,6 +341,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
               const SizedBox(height: 54),
             ],
           ),
+        ),
         ),
       ),
     );

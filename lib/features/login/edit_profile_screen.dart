@@ -69,7 +69,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           }
         }
       } catch (e) {
-        print('Error loading user data: $e');
+        debugPrint('Data load fail: $e');
       }
     }
   }
@@ -112,6 +112,31 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Error: $e')));
     }
+  }
+
+  // 💾 저장 버튼 클릭 시 '확인 팝업' 띄우기
+  void _onSavePressed() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Save Changes"),
+        content: const Text("Are you sure you want to update your profile information?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context), // cancel
+            child: const Text("cancel", style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // 팝업 닫고
+              _saveChanges(); // 실제 저장 로직 실행
+            },
+            child:
+                const Text("confirm", style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _verifyCurrentPassword() async {
@@ -194,13 +219,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       // ✅ 닉네임 변경 반영을 위해 상태 무효화
       ref.invalidate(userProvider);
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated successfully!')));
-      Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Profile updated successfully.")),
+        );
+        Navigator.pop(context); // 화면 닫기
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Failed to update: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error occurred: $e")),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -221,7 +251,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         actions: [
           TextButton(
-            onPressed: _isLoading ? null : _saveChanges,
+            onPressed: _isLoading ? null : _onSavePressed,
             child: const Text("Save",
                 style: TextStyle(
                     color: Colors.blue,
@@ -230,10 +260,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           )
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(), // ⚡ 화면 탭 시 키보드 내리기
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
               child: Stack(
@@ -391,6 +423,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             ),
             const SizedBox(height: 40),
           ],
+        ),
         ),
       ),
     );
