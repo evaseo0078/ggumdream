@@ -71,7 +71,7 @@ class AuthRepository {
       // 이메일 형식 오류, 중복, 약한 비밀번호 등은 그대로 UI 에서 처리
       throw e;
     } catch (e) {
-      // ❗ 여기서 지금 보고 있는 PigeonUserDetails 캐스트 오류가 발생함
+      // ❗ PigeonUserDetails 캐스트 오류 방어
       if (e.toString().contains('PigeonUserDetails')) {
         // 실제로는 계정이 만들어지고 로그인까지 된 상태라 currentUser 가 존재함
         user = _auth.currentUser;
@@ -83,22 +83,37 @@ class AuthRepository {
     user ??= _auth.currentUser;
     if (user == null) {
       // 여기까지 오면 정말로 뭔가 이상한 상황
-      throw Exception('Sign-up was successful, but failed to retrieve user information');
+      throw Exception(
+          'Sign-up was successful, but failed to retrieve user information');
     }
 
     final uid = user.uid;
 
-    // 3) Firestore에 프로필 + 기본 코인 1000 저장
+    // 3) Firestore에 프로필 + 기본 코인 1000 + 기본 이미지 인덱스 저장
     await _db.collection('users').doc(uid).set({
       'name': name,
       'nickname': nickname,
       'email': email,
       'coins': 1000,
+      'profileImageIndex': 1, // ✨ 기본 프로필 이미지 1번 설정
       'createdAt': FieldValue.serverTimestamp(),
     });
 
     // 4) 로컬에도 이메일/비밀번호 저장 (자동 로그인 용도)
     await saveCredentials(email, password);
+  }
+
+  // =========================================
+  // 📸 프로필 이미지 변경 (추가된 기능)
+  // =========================================
+  Future<void> updateProfileImage(String userId, int imageIndex) async {
+    try {
+      await _db.collection('users').doc(userId).update({
+        'profileImageIndex': imageIndex,
+      });
+    } catch (e) {
+      throw Exception('Failed to update profile image: $e');
+    }
   }
 
   // =========================================
