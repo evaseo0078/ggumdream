@@ -291,30 +291,37 @@ class AccountScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              Container(
+                Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.05),
+                  color: Colors.green.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.green.shade100),
+                  border: Border.all(color: Colors.green.shade200),
+                  boxShadow: [
+                  BoxShadow(
+                    color: const Color.fromRGBO(192, 255, 194, 1).withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                  ],
                 ),
                 child: myPurchasedItems.isEmpty &&
-                        userState.purchaseHistory.isEmpty
-                    ? const Text("No purchase history.",
-                        style: TextStyle(color: Colors.grey))
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (myPurchasedItems.isNotEmpty)
-                            ...myPurchasedItems.map(
-                                (item) => _buildPurchaseItem(context, item)),
-                          if (userState.purchaseHistory.isNotEmpty)
-                            ...userState.purchaseHistory.map(
-                                (item) => _buildPurchaseItem(context, item)),
-                        ],
-                      ),
-              ),
+                    userState.purchaseHistory.isEmpty
+                  ? const Text("No purchase history.",
+                    style: TextStyle(color: Colors.grey))
+                  : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (myPurchasedItems.isNotEmpty)
+                      ...myPurchasedItems.map(
+                        (item) => _buildPurchaseItem(context, item)),
+                      if (userState.purchaseHistory.isNotEmpty)
+                      ...userState.purchaseHistory.map(
+                        (item) => _buildPurchaseItem(context, item)),
+                    ],
+                    ),
+                ),
 
               const SizedBox(height: 24),
 
