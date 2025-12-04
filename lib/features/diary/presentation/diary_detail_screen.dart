@@ -8,6 +8,7 @@ import '../application/diary_providers.dart';
 import '../application/shop_provider.dart'; // 판매 상태 체크용
 import '../application/user_provider.dart'; // 사용자 확인용
 import '../../../shared/widgets/glass_card.dart'; // GlassCard import 추가
+import 'dart:ui'; // ImageFilter를 사용하기 위해 추가
 
 class DiaryDetailScreen extends ConsumerWidget {
   final DiaryEntry? entry;
@@ -82,27 +83,7 @@ class DiaryDetailScreen extends ConsumerWidget {
         title: Text(
           DateFormat('yyyy/MM/dd (E)').format(e.date),
           style: const TextStyle(color: Color.fromARGB(255, 255, 255, 255), fontWeight: FontWeight.bold, fontFamily: 'Stencil',),
-          
         ),
-        // ⚡ [추가됨] 수정 버튼
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_note, color: Color.fromARGB(255, 255, 255, 255)),
-            tooltip: "Edit Diary",
-            onPressed: () {
-              // 수정 화면으로 이동 (현재 entry를 전달)
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => DiaryEditorScreen(
-                    selectedDate: e.date, // 날짜는 형식상 전달 (에디터 내부에서 entry.date 사용)
-                    existingEntry: e,     // ⚡ 핵심: 기존 데이터를 넘겨줌
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
       ),
       body: Container(
         height: double.infinity, // Fill the entire height
@@ -282,35 +263,33 @@ class DiaryDetailScreen extends ConsumerWidget {
             ),
           );
         },
-        backgroundColor: const Color(0xFFAABCC5),
-        child: const Icon(Icons.edit, color: Colors.white, size: 28),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(50),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.25),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.4),
+                  width: 1.5,
+                ),
+              ),
+              child: const Icon(
+                Icons.edit,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+          ),
+        ),
       );
     }
     return null; // 편집 불가능한 경우 null 반환
   }
 
-  Widget _buildResultBox(String label, String content) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.black12),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            content,
-            style: const TextStyle(fontSize: 12),
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
+  
 }
