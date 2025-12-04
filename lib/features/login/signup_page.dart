@@ -153,9 +153,11 @@ class _SignupPageState extends ConsumerState<SignupPage> {
           style: TextStyle(color: Color.fromARGB(255, 216, 169, 255), fontSize: 16, fontWeight: FontWeight.bold),
         ),
       ),
-      body: Container(
-        height: double.infinity, // Ensure the gradient fills the entire screen
-        decoration: const BoxDecoration(
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(), // ⚡ 화면 탭 시 키보드 내리기
+        child: Container(
+          height: double.infinity, // Ensure the gradient fills the entire screen
+          decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -234,6 +236,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
               const SizedBox(height: 30),
             ],
           ),
+        ),
         ),
       ),
     );

@@ -59,7 +59,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           });
         }
       } catch (e) {
-        debugPrint('데이터 로드 실패: $e');
+        debugPrint('Data load fail: $e');
       }
     }
   }
@@ -143,12 +143,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("변경 사항 저장"),
-        content: const Text("프로필 정보를 정말로 수정하시겠습니까?"),
+        title: const Text("Save Changes"),
+        content: const Text("Are you sure you want to update your profile information?"),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context), // 취소
-            child: const Text("취소", style: TextStyle(color: Colors.grey)),
+            onPressed: () => Navigator.pop(context), // cancel
+            child: const Text("cancel", style: TextStyle(color: Colors.grey)),
           ),
           TextButton(
             onPressed: () {
@@ -156,7 +156,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               _saveProfile(); // 실제 저장 로직 실행
             },
             child:
-                const Text("확인", style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text("confirm", style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -190,10 +190,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       // 2. 비밀번호 변경 로직
       if (_currentPasswordController.text.isNotEmpty) {
         if (_newPasswordController.text.isEmpty) {
-          throw Exception("새 비밀번호를 입력해주세요.");
+          throw Exception("Please enter a new password.");
         }
         if (_newPasswordController.text != _confirmPasswordController.text) {
-          throw Exception("새 비밀번호가 일치하지 않습니다.");
+          throw Exception("New passwords do not match.");
         }
 
         // 재인증
@@ -208,14 +208,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("프로필이 성공적으로 업데이트되었습니다.")),
+          const SnackBar(content: Text("Profile updated successfully.")),
         );
         Navigator.pop(context); // 화면 닫기
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("오류 발생: $e")),
+          SnackBar(content: Text("Error occurred: $e")),
         );
       }
     } finally {
@@ -229,9 +229,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       appBar: AppBar(
         title: const Text("Edit Profile"),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(), // ⚡ 화면 탭 시 키보드 내리기
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
           children: [
             // ✨ 프로필 사진 표시 및 변경 (상단 중앙)
             GestureDetector(
@@ -295,7 +297,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
-              child: const Text("비밀번호를 변경하려면 현재 비밀번호를 입력하세요.",
+              child: const Text("To change your password, please enter your current password.",
                   style: TextStyle(color: Colors.grey, fontSize: 12)),
             ),
             const SizedBox(height: 16),
@@ -353,6 +355,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );
