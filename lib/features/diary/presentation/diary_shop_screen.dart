@@ -7,6 +7,7 @@ import '../application/shop_provider.dart';
 import '../application/user_provider.dart';
 import 'shop_detail_screen.dart';
 import 'user_dreams_grid_screen.dart'; // ⚡ import 추가
+import '../../../shared/widgets/glass_card.dart';
 
 class DiaryShopScreen extends ConsumerStatefulWidget {
   const DiaryShopScreen({super.key});
@@ -38,81 +39,97 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
     });
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color(0xFFAABCC5), // Light blue-gray
-                    Color(0xFF6A8FA5), // Darker blue-gray
-                  ],
-                ),
-                borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-              ),
-              child: const Text(
-                "GGUM store",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, fontFamily: 'Stencil'),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      _buildTabButton("Market", !_showMySales),
-                      const SizedBox(width: 10),
-                      _buildTabButton("My Sales", _showMySales),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFE6E6FA), // Light purple
+              Color.fromARGB(255, 168, 152, 255),
+              Color.fromARGB(255, 152, 176, 255) // Dark purple
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                       Color.fromARGB(200, 192, 171, 255),
+                      Color.fromARGB(255, 192, 171, 255), // Light blue-gray
+                      // Darker blue-gray
                     ],
                   ),
-                  Row(
-                    children: [
-                      const CircleAvatar(
-                        radius: 14,
-                        backgroundColor: Colors.deepPurple,
-                        child: Icon(Icons.star, color: Colors.white, size: 16),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        color: Colors.grey[300],
+                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+                ),
+                child: const Text(
+                  "GGUM store",
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, fontFamily: 'Stencil', color: Colors.white),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        _buildTabButton("Market", !_showMySales),
+                        const SizedBox(width: 10),
+                        _buildTabButton("My Sales", _showMySales),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        const CircleAvatar(
+                          radius: 14,
+                          backgroundColor: Colors.deepPurple,
+                          child: Icon(Icons.star, color: Colors.white, size: 16),
+                        ),
+                        const SizedBox(width: 8),
+                        GlassCard(
+                          radius: 12,
+                          opacity: 0.4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            child: Text(
+                              "${userState.coins}",
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  ],
+                ),
+              ),
+              Expanded(
+                child: filteredItems.isEmpty
+                    ? Center(
                         child: Text(
-                          "${userState.coins}",
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          _showMySales
+                              ? "You are not selling any dreams."
+                              : "No items in the market.",
+                          style: const TextStyle(color: Colors.grey),
                         ),
                       )
-                    ],
-                  )
-                ],
-              ),
-            ),
-            Expanded(
-              child: filteredItems.isEmpty
-                  ? Center(
-                      child: Text(
-                        _showMySales
-                            ? "You are not selling any dreams."
-                            : "No items in the market.",
-                        style: const TextStyle(color: Colors.grey),
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: filteredItems.length,
+                        itemBuilder: (context, index) {
+                          return _buildShopItem(context, ref, filteredItems[index], userState.userId);
+                        },
                       ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: filteredItems.length,
-                      itemBuilder: (context, index) {
-                        return _buildShopItem(context, ref, filteredItems[index], userState.userId);
-                      },
-                    ),
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -125,18 +142,17 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
           _showMySales = (text == "My Sales");
         });
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          color: isActive ? const Color(0xFFAABCC5) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: isActive ? null : Border.all(color: Colors.grey),
-        ),
-        child: Text(
-          text,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: isActive ? Colors.black : Colors.grey,
+      child: GlassCard(
+        radius: 20,
+        opacity: isActive ? 0.3 : 0.1,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: Text(
+            text,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: isActive ? Colors.white : Colors.grey, // Changed active text color to white
+            ),
           ),
         ),
       ),
@@ -159,15 +175,22 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
           MaterialPageRoute(builder: (context) => ShopDetailScreen(item: item)),
         );
       },
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: GlassCard(
+          radius: 14,
+          opacity: 0.1, // Default opacity
+          child: Container(
             decoration: BoxDecoration(
-              color: item.isSold ? Colors.grey[200] : Colors.white,
-              border: Border.all(color: Colors.black12),
-              borderRadius: BorderRadius.circular(4),
+              color: item.isSold
+                  ? Color.fromARGB(255, 200, 200, 200).withOpacity(0.5)
+                  : Colors.white.withOpacity(0.2), // Background color based on isSold
+              borderRadius: BorderRadius.circular(14),
+              border: item.isSold
+                  ? Border.all(color: Colors.grey.withOpacity(0.5), width: 2.0) // Light gray border for sold items
+                  : null,
             ),
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -176,7 +199,11 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                   children: [
                     Text(
                       dateText,
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 14, // Increased font size
+                        fontWeight: FontWeight.bold,
+                        color: item.isSold ? const Color.fromARGB(255, 89, 89, 89) : const Color.fromARGB(255, 255, 255, 255),
+                      ),
                     ),
                     GestureDetector(
                       onTap: () {
@@ -214,9 +241,15 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                     Container(
                       width: 80,
                       height: 80,
-                      color: Colors.grey[300],
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(12), // Rounded corners for images
+                      ),
                       child: item.imageUrl != null
-                          ? Image.network(item.imageUrl!, fit: BoxFit.cover)
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(12), // Match the container's rounded corners
+                              child: Image.network(item.imageUrl!, fit: BoxFit.cover),
+                            )
                           : Icon(Icons.image, color: item.isSold ? Colors.grey[400] : Colors.grey),
                     ),
                     const SizedBox(width: 12),
@@ -233,8 +266,6 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 decoration: item.isSold ? TextDecoration.lineThrough : null,
-                                color: item.isSold ? Colors.grey : Colors.black,
-                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ),
@@ -247,7 +278,11 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                               else if (isMine)
                                 const Text("Selling", style: TextStyle(color: Colors.orange)),
                               const SizedBox(width: 12),
-                              WobblyPriceTag(price: item.price, isSold: item.isSold),
+                              WobblyPriceTag(
+                                price: item.price,
+                                isSold: item.isSold,
+                                backgroundColor: const Color.fromARGB(108, 197, 171, 255), // Light purple background
+                              ),
                             ],
                           ),
                         ],
@@ -258,8 +293,7 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
-        ],
+        ),
       ),
     );
   }
@@ -268,11 +302,13 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
 class WobblyPriceTag extends StatelessWidget {
   final int price;
   final bool isSold;
+  final Color backgroundColor;
 
   const WobblyPriceTag({
     super.key,
     required this.price,
     required this.isSold,
+    this.backgroundColor = const Color(0xFFAABCC5),
   });
 
   @override
@@ -280,14 +316,14 @@ class WobblyPriceTag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: isSold ? Colors.grey : const Color(0xFFAABCC5),
+        color: isSold ? Colors.grey : backgroundColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.black12),
       ),
       child: Text(
         "$price coins",
         style: TextStyle(
-          color: isSold ? Colors.white : Colors.black,
+          color: isSold ? const Color.fromARGB(255, 63, 63, 63) : const Color.fromARGB(255, 255, 255, 255),
           fontWeight: FontWeight.bold,
         ),
       ),
