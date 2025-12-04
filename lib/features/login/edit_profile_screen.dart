@@ -1,9 +1,11 @@
+// lib/features/login/edit_profile_screen.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_repository.dart';
-import '../diary/application/user_provider.dart';
+// user_provider import가 없어도 동작하도록 수정함
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -13,38 +15,40 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
-  // 텍스트 컨트롤러
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _nicknameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
 
-  // 비밀번호 관련 컨트롤러
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  // 비밀번호 보이기/숨기기 상태 변수
   bool _isCurrentPasswordVisible = false;
   bool _isNewPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
 
   bool _isLoading = false;
-  int _currentImageIndex = 1; // 현재 프로필 이미지 인덱스
+  int _currentImageIndex = 1;
+  bool _isCurrentVerified = false;
+  String? _currentPasswordError;
+  String? _newPasswordError;
+  String? _confirmPasswordError;
+
+  String? _originalNickname;
+  bool _isNicknameChecked = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchUserData();
+    _loadUserData();
   }
 
-  // 🔥 Firestore에서 'name'과 'nickname', 'profileImageIndex'를 정확히 가져오기
-  Future<void> _fetchUserData() async {
+  Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      // 1. 이메일은 Auth에서 바로 가져옴
       _emailController.text = user.email ?? '';
+      _nameController.text = user.displayName ?? '';
 
-      // 2. 나머지는 Firestore에서 가져옴
       try {
         final doc = await FirebaseFirestore.instance
             .collection('users')
@@ -52,11 +56,17 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             .get();
         if (doc.exists) {
           final data = doc.data()!;
-          setState(() {
-            _nameController.text = data['name'] ?? ''; // 실명
-            _nicknameController.text = data['nickname'] ?? ''; // 닉네임
-            _currentImageIndex = data['profileImageIndex'] ?? 1; // 프로필 이미지
-          });
+          if (data['name'] != null) _nameController.text = data['name'];
+
+          final nickname = data['nickname'] ?? '';
+          _nicknameController.text = nickname;
+          _originalNickname = nickname;
+
+          if (data['profileImageIndex'] != null) {
+            setState(() {
+              _currentImageIndex = data['profileImageIndex'];
+            });
+          }
         }
       } catch (e) {
         debugPrint('Data load fail: $e');
@@ -75,67 +85,33 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     super.dispose();
   }
 
-  // 📸 프로필 사진 변경 팝업 (AccountScreen과 동일 로직)
-  void _showProfilePicker() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: 300,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            const Text(
-              'Choose Profile Picture',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 5,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                ),
-                itemCount: 5,
-                itemBuilder: (context, index) {
-                  final imageIndex = index + 1;
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _currentImageIndex = imageIndex; // 화면에 즉시 반영
-                      });
-                      Navigator.pop(context);
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: _currentImageIndex == imageIndex
-                              ? Colors.blue
-                              : Colors.grey.shade300,
-                          width: _currentImageIndex == imageIndex ? 3 : 1,
-                        ),
-                      ),
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/images/profile$imageIndex.png',
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  Future<void> _checkNickname() async {
+    final newNickname = _nicknameController.text.trim();
+    if (newNickname.isEmpty) return;
+
+    if (newNickname == _originalNickname) {
+      setState(() => _isNicknameChecked = true);
+      return;
+    }
+
+    final repo = ref.read(authRepositoryProvider);
+    try {
+      final isAvailable = await repo.checkNickname(newNickname);
+      if (!mounted) return;
+
+      if (isAvailable) {
+        setState(() => _isNicknameChecked = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Nickname is available!')));
+      } else {
+        setState(() => _isNicknameChecked = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Nickname is already taken.')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
   }
 
   // 💾 저장 버튼 클릭 시 '확인 팝업' 띄우기
@@ -153,7 +129,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(context); // 팝업 닫고
-              _saveProfile(); // 실제 저장 로직 실행
+              _saveChanges(); // 실제 저장 로직 실행
             },
             child:
                 const Text("confirm", style: TextStyle(fontWeight: FontWeight.bold)),
@@ -163,48 +139,85 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     );
   }
 
-  // 실제 저장 로직
-  Future<void> _saveProfile() async {
-    if (_isLoading) return;
+  Future<void> _verifyCurrentPassword() async {
+    final currentPassword = _currentPasswordController.text.trim();
+    if (currentPassword.isEmpty) {
+      setState(() => _currentPasswordError = 'Please enter current password');
+      return;
+    }
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.email == null) return;
+
+    try {
+      final cred = EmailAuthProvider.credential(
+          email: user.email!, password: currentPassword);
+      await user.reauthenticateWithCredential(cred);
+      setState(() {
+        _isCurrentVerified = true;
+        _currentPasswordError = null;
+      });
+    } catch (e) {
+      setState(() {
+        _isCurrentVerified = false;
+        _currentPasswordError = 'Incorrect password';
+      });
+    }
+  }
+
+  Future<void> _saveChanges() async {
+    setState(() {
+      _newPasswordError = null;
+      _confirmPasswordError = null;
+    });
+
+    if (!_isNicknameChecked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please check nickname availability.')));
+      return;
+    }
+
+    String? newPassword;
+    if (_newPasswordController.text.isNotEmpty) {
+      if (!_isCurrentVerified) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Please verify current password first.')));
+        return;
+      }
+      if (_newPasswordController.text != _confirmPasswordController.text) {
+        setState(() => _confirmPasswordError = 'Passwords do not match');
+        return;
+      }
+      if (_newPasswordController.text.length < 6) {
+        setState(
+            () => _newPasswordError = 'Password must be at least 6 characters');
+        return;
+      }
+      newPassword = _newPasswordController.text.trim();
+    }
 
     setState(() => _isLoading = true);
 
     try {
-      final authRepo = ref.read(authRepositoryProvider);
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
+      if (user == null) throw Exception('No user');
 
-      // 1. Firestore 정보 업데이트 (닉네임 + 이미지 인덱스)
-      // Name은 보통 가입 후 변경 불가 정책을 쓰지만, 필요하다면 여기서 같이 업데이트 가능
+      final repo = ref.read(authRepositoryProvider);
+
+      if (newPassword != null) {
+        await repo.changePassword(_currentPasswordController.text, newPassword);
+      }
+
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .update({
-        'nickname': _nicknameController.text,
+        'name': _nameController.text.trim(),
+        'nickname': _nicknameController.text.trim(),
         'profileImageIndex': _currentImageIndex,
       });
 
-      // UserProvider 강제 새로고침 (앱 전반에 변경 사항 반영)
-      ref.invalidate(userProvider);
-
-      // 2. 비밀번호 변경 로직
-      if (_currentPasswordController.text.isNotEmpty) {
-        if (_newPasswordController.text.isEmpty) {
-          throw Exception("Please enter a new password.");
-        }
-        if (_newPasswordController.text != _confirmPasswordController.text) {
-          throw Exception("New passwords do not match.");
-        }
-
-        // 재인증
-        await authRepo.reauthenticate(
-          email: _emailController.text,
-          password: _currentPasswordController.text,
-        );
-
-        // 비밀번호 업데이트
-        await authRepo.updatePassword(_newPasswordController.text);
-      }
+      // ✅ [수정] Provider 이름 불일치 에러 방지를 위해 제거함 (자동 반영됨)
+      // ref.refresh(userProvider);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -226,18 +239,35 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text("Edit Profile"),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text("Edit Profile",
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        actions: [
+          TextButton(
+            onPressed: _isLoading ? null : _onSavePressed,
+            child: const Text("Save",
+                style: TextStyle(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16)),
+          )
+        ],
       ),
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(), // ⚡ 화면 탭 시 키보드 내리기
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ✨ 프로필 사진 표시 및 변경 (상단 중앙)
-            GestureDetector(
-              onTap: _showProfilePicker,
+            Center(
               child: Stack(
                 children: [
                   CircleAvatar(
@@ -247,113 +277,150 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         'assets/images/profile$_currentImageIndex.png'),
                   ),
                   Positioned(
-                    right: 0,
                     bottom: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.blue,
-                        shape: BoxShape.circle,
+                    right: 0,
+                    child: GestureDetector(
+                      onTap: () {
+                        showModalBottomSheet(
+                          context: context,
+                          builder: (ctx) => Container(
+                            height: 200,
+                            padding: const EdgeInsets.all(20),
+                            child: GridView.builder(
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 4,
+                                      crossAxisSpacing: 10,
+                                      mainAxisSpacing: 10),
+                              itemCount: 5,
+                              itemBuilder: (context, index) {
+                                final imgIndex = index + 1;
+                                return GestureDetector(
+                                  onTap: () {
+                                    setState(
+                                        () => _currentImageIndex = imgIndex);
+                                    Navigator.pop(context);
+                                  },
+                                  child: CircleAvatar(
+                                      backgroundImage: AssetImage(
+                                          'assets/images/profile$imgIndex.png')),
+                                );
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                            color: Colors.blue, shape: BoxShape.circle),
+                        child: const Icon(Icons.camera_alt,
+                            color: Colors.white, size: 20),
                       ),
-                      child: const Icon(Icons.camera_alt,
-                          color: Colors.white, size: 20),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 32),
-
-            // 기본 정보 섹션
-            Align(
-              alignment: Alignment.centerLeft,
-              child: const Text("Basic Info",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(height: 16),
-
-            _buildTextField(
-                label: "Name",
+            const SizedBox(height: 30),
+            _buildLabel("Name"),
+            _buildField(
                 controller: _nameController,
-                readOnly: true), // 이름 수정 불가
-            const SizedBox(height: 16),
-            _buildTextField(
-                label: "Nickname",
-                controller: _nicknameController), // 닉네임 수정 가능 (키보드 뜸)
-            const SizedBox(height: 16),
-            _buildTextField(
-                label: "Email", controller: _emailController, readOnly: true),
-
-            const SizedBox(height: 32),
+                isVisible: true,
+                onToggleVisibility: () {}),
+            const SizedBox(height: 20),
+            _buildLabel("Nickname"),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _nicknameController,
+                    onChanged: (val) {
+                      if (val != _originalNickname) {
+                        setState(() => _isNicknameChecked = false);
+                      } else {
+                        setState(() => _isNicknameChecked = true);
+                      }
+                    },
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.grey[300]!)),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.grey[300]!)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _checkNickname,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        _isNicknameChecked ? Colors.green : Colors.blue,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 16, horizontal: 16),
+                  ),
+                  child: Text(_isNicknameChecked ? "OK" : "Check",
+                      style: const TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _buildLabel("Email"),
+            _buildField(
+                controller: _emailController,
+                isVisible: true,
+                onToggleVisibility: () {},
+                readOnly: true),
+            const SizedBox(height: 30),
             const Divider(),
-            const SizedBox(height: 16),
-
-            // 비밀번호 변경 섹션
-            Align(
-              alignment: Alignment.centerLeft,
-              child: const Text("Change Password",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: const Text("To change your password, please enter your current password.",
-                  style: TextStyle(color: Colors.grey, fontSize: 12)),
-            ),
-            const SizedBox(height: 16),
-
-            _buildPasswordField(
+            const SizedBox(height: 20),
+            const Text("Change Password",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            _buildField(
               label: "Current Password",
               controller: _currentPasswordController,
               isVisible: _isCurrentPasswordVisible,
-              onToggleVisibility: () {
-                setState(() =>
-                    _isCurrentPasswordVisible = !_isCurrentPasswordVisible);
-              },
+              onToggleVisibility: () => setState(
+                  () => _isCurrentPasswordVisible = !_isCurrentPasswordVisible),
+              errorText: _currentPasswordError,
             ),
-            const SizedBox(height: 16),
-
-            _buildPasswordField(
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                  onPressed: _verifyCurrentPassword,
+                  child: Text(_isCurrentVerified ? "Verified" : "Verify",
+                      style: TextStyle(
+                          color: _isCurrentVerified
+                              ? Colors.green
+                              : Colors.blue))),
+            ),
+            _buildField(
               label: "New Password",
               controller: _newPasswordController,
               isVisible: _isNewPasswordVisible,
-              onToggleVisibility: () {
-                setState(() => _isNewPasswordVisible = !_isNewPasswordVisible);
-              },
+              onToggleVisibility: () => setState(
+                  () => _isNewPasswordVisible = !_isNewPasswordVisible),
+              errorText: _newPasswordError,
+              readOnly: !_isCurrentVerified,
             ),
-            const SizedBox(height: 16),
-
-            _buildPasswordField(
-              label: "Confirm New Password",
+            const SizedBox(height: 15),
+            _buildField(
+              label: "Confirm Password",
               controller: _confirmPasswordController,
               isVisible: _isConfirmPasswordVisible,
-              onToggleVisibility: () {
-                setState(() =>
-                    _isConfirmPasswordVisible = !_isConfirmPasswordVisible);
-              },
+              onToggleVisibility: () => setState(
+                  () => _isConfirmPasswordVisible = !_isConfirmPasswordVisible),
+              errorText: _confirmPasswordError,
+              readOnly: !_isCurrentVerified,
             ),
-
             const SizedBox(height: 40),
-
-            // 저장 버튼
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _onSavePressed, // ✨ 팝업 함수 연결
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
-                child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("Save Changes",
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
-            ),
           ],
         ),
         ),
@@ -361,72 +428,53 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     );
   }
 
-  Widget _buildTextField({
-    required String label,
-    required TextEditingController controller,
-    bool readOnly = false,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          readOnly: readOnly,
-          // ✨ 탭 했을 때 전체 선택되는 동작 방지 (기본 동작이 커서 이동임)
-          enableInteractiveSelection: true,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: readOnly ? Colors.grey[200] : Colors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  Widget _buildLabel(String text) => Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Text(text, style: const TextStyle(fontWeight: FontWeight.w600)));
 
-  Widget _buildPasswordField({
-    required String label,
-    required TextEditingController controller,
-    required bool isVisible,
-    required VoidCallback onToggleVisibility,
-  }) {
+  Widget _buildField(
+      {String label = "",
+      required TextEditingController controller,
+      required bool isVisible,
+      required VoidCallback onToggleVisibility,
+      bool readOnly = false,
+      VoidCallback? onTap,
+      String? errorText}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
+        if (label.isNotEmpty) ...[
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8)
+        ],
         TextField(
           controller: controller,
-          obscureText: !isVisible,
+          obscureText: !isVisible && label.toLowerCase().contains("password"),
+          readOnly: readOnly,
+          onTap: onTap,
           decoration: InputDecoration(
             filled: true,
             fillColor: Colors.white,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!)),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            suffixIcon: IconButton(
-              icon: Icon(
-                isVisible ? Icons.visibility : Icons.visibility_off,
-                color: Colors.grey,
-              ),
-              onPressed: onToggleVisibility,
-            ),
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!)),
+            suffixIcon: label.toLowerCase().contains("password")
+                ? IconButton(
+                    icon: Icon(
+                        isVisible ? Icons.visibility : Icons.visibility_off,
+                        color: Colors.grey),
+                    onPressed: onToggleVisibility)
+                : null,
           ),
         ),
+        if (errorText != null) ...[
+          const SizedBox(height: 8),
+          Text(errorText,
+              style: const TextStyle(color: Colors.red, fontSize: 12))
+        ],
       ],
     );
   }

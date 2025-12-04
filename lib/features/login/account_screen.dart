@@ -149,15 +149,18 @@ class AccountScreen extends ConsumerWidget {
                               profileIndex = data?['profileImageIndex'] ?? 1;
                             }
 
+                            debugPrint(
+                                'Loaded profileImageIndex: $profileIndex');
                             return CircleAvatar(
                               radius: 50,
                               backgroundColor: const Color(0xFFAABCC5),
-                              // 이미지가 있으면 이미지 표시, 없으면 아이콘
-                              backgroundImage: AssetImage(
-                                  'assets/images/profile$profileIndex.png'),
-                              onBackgroundImageError: (_, __) {
-                                // 이미지 로드 실패 시 처리 (옵션)
-                              },
+                              child: ClipOval(
+                                child: Image.asset(
+                                  'assets/images/profile$profileIndex.png',
+                                  key: ValueKey('profile_$profileIndex'),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
                             );
                           },
                         ),
@@ -411,7 +414,8 @@ class AccountScreen extends ConsumerWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ShopDetailScreen(item: item, isPurchased: true),
+            builder: (context) =>
+                ShopDetailScreen(item: item, isPurchased: true),
           ),
         );
       },
@@ -433,7 +437,8 @@ class AccountScreen extends ConsumerWidget {
                 children: [
                   Text(
                     item.summary ?? item.content,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w500),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -446,7 +451,10 @@ class AccountScreen extends ConsumerWidget {
             ),
             Text(
               "${item.price}c",
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green),
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green),
             ),
           ],
         ),
@@ -460,7 +468,8 @@ class AccountScreen extends ConsumerWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ShopDetailScreen(item: item, isPurchased: false),
+            builder: (context) =>
+                ShopDetailScreen(item: item, isPurchased: false),
           ),
         );
       },
@@ -482,7 +491,8 @@ class AccountScreen extends ConsumerWidget {
                 children: [
                   Text(
                     item.summary ?? item.content,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w500),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -499,7 +509,10 @@ class AccountScreen extends ConsumerWidget {
             ),
             Text(
               "${item.price}c",
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange),
             ),
           ],
         ),
