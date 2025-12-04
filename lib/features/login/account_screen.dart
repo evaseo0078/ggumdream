@@ -109,7 +109,11 @@ class AccountScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Account'),
+        title: const Text(
+          'My Account',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold), // 텍스트 색상을 흰색으로 변경
+        ),
+        backgroundColor: const Color.fromARGB(255, 192, 171, 255),
       ),
       body: SingleChildScrollView(
         child: Padding(

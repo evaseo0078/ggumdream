@@ -39,98 +39,112 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
     });
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFE6E6FA), // Light purple
-              Color.fromARGB(255, 168, 152, 255),
-              Color.fromARGB(255, 152, 176, 255) // Dark purple
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                       Color.fromARGB(200, 192, 171, 255),
-                      Color.fromARGB(255, 192, 171, 255), // Light blue-gray
-                      // Darker blue-gray
-                    ],
-                  ),
-                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-                ),
-                child: const Text(
-                  "GGUM store",
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, fontFamily: 'Stencil', color: Colors.white),
+      body: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/images/shop_background.jpg'),
+                fit: BoxFit.cover,
+                colorFilter: ColorFilter.mode(
+                  Colors.black.withOpacity(1), 
+                  BlendMode.dstATop,
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        _buildTabButton("Market", !_showMySales),
-                        const SizedBox(width: 10),
-                        _buildTabButton("My Sales", _showMySales),
-                      ],
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color.fromARGB(255, 192, 171, 255),
+                  Color.fromARGB(255, 192, 171, 255),
+                  const Color.fromARGB(0, 255, 255, 255),
+                  const Color.fromARGB(0, 255, 255, 255),// 투명도를 더 낮게 설정
+                  const Color.fromARGB(198, 184, 192, 255), // Fully transparent
+                ],
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: Colors.transparent, // 컨테이너를 투명하게 설정
+                  ),
+                  child: const Text(
+                    "GGUM store",
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Stencil',
+                      color: Colors.white,
                     ),
-                    Row(
-                      children: [
-                        const CircleAvatar(
-                          radius: 14,
-                          backgroundColor: Colors.deepPurple,
-                          child: Icon(Icons.star, color: Colors.white, size: 16),
-                        ),
-                        const SizedBox(width: 8),
-                        GlassCard(
-                          radius: 12,
-                          opacity: 0.4,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            child: Text(
-                              "${userState.coins}",
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          _buildTabButton("Market", !_showMySales),
+                          const SizedBox(width: 10),
+                          _buildTabButton("My Sales", _showMySales),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          const CircleAvatar(
+                            radius: 14,
+                            backgroundColor: Colors.deepPurple,
+                            child: Icon(Icons.star, color: Colors.white, size: 16),
+                          ),
+                          const SizedBox(width: 8),
+                          GlassCard(
+                            radius: 12,
+                            opacity: 0.4,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              child: Text(
+                                "${userState.coins}",
+                                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    )
-                  ],
-                ),
-              ),
-              Expanded(
-                child: filteredItems.isEmpty
-                    ? Center(
-                        child: Text(
-                          _showMySales
-                              ? "You are not selling any dreams."
-                              : "No items in the market.",
-                          style: const TextStyle(color: Colors.grey),
-                        ),
+                        ],
                       )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        itemCount: filteredItems.length,
-                        itemBuilder: (context, index) {
-                          return _buildShopItem(context, ref, filteredItems[index], userState.userId);
-                        },
-                      ),
-              ),
-            ],
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: filteredItems.isEmpty
+                      ? Center(
+                          child: Text(
+                            _showMySales
+                                ? "You are not selling any dreams."
+                                : "No items in the market.",
+                            style: const TextStyle(color: Colors.grey),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          itemCount: filteredItems.length,
+                          itemBuilder: (context, index) {
+                            return _buildShopItem(context, ref, filteredItems[index], userState.userId);
+                          },
+                        ),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -294,7 +308,7 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
             ),
           ),
         ),
-      ),
+      )
     );
   }
 }
