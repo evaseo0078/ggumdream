@@ -5,7 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_repository.dart';
-// user_provider import가 없어도 동작하도록 수정함
+import '../diary/application/user_provider.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -191,8 +191,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         'profileImageIndex': _currentImageIndex,
       });
 
-      // ✅ [수정] Provider 이름 불일치 에러 방지를 위해 제거함 (자동 반영됨)
-      // ref.refresh(userProvider);
+      // ✅ 닉네임 변경 반영을 위해 상태 무효화
+      ref.invalidate(userProvider);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -341,10 +341,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             const SizedBox(height: 20),
             _buildLabel("Email"),
             _buildField(
-                controller: _emailController,
-                isVisible: true,
-                onToggleVisibility: () {},
-                readOnly: true),
+              controller: _emailController,
+              isVisible: true,
+              onToggleVisibility: () {},
+              readOnly: true,
+            ),
             const SizedBox(height: 30),
             const Divider(),
             const SizedBox(height: 20),
@@ -380,7 +381,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             ),
             const SizedBox(height: 15),
             _buildField(
-              label: "Confirm Password",
+              label: "Confirm New Password",
               controller: _confirmPasswordController,
               isVisible: _isConfirmPasswordVisible,
               onToggleVisibility: () => setState(

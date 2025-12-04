@@ -101,6 +101,16 @@ class AuthRepository {
     }
   }
 
+  // ✅ Email 중복 확인 (사용 가능하면 true 반환)
+  Future<bool> checkEmail(String email) async {
+    final result = await _db
+        .collection('users')
+        .where('email', isEqualTo: email)
+        .limit(1)
+        .get();
+    return result.docs.isEmpty;
+  }
+
   // ✅ [6] 회원가입
   Future<void> signUp({
     required String name,
