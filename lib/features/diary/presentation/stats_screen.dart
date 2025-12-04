@@ -13,12 +13,12 @@ class StatsScreen extends ConsumerWidget {
     // 전체 일기 데이터 가져오기
     final diaryList = ref.watch(diaryListProvider);
 
-    // 1. 데이터 가공: 악몽 vs 일반꿈 비율
+    // 1. 데이터 가공: 악몽 vs 일반꿈 비율 (새 이모지 기준)
     int nightmareCount = 0;
     int normalCount = 0;
 
     for (var entry in diaryList) {
-      if (entry.mood == '👻' || entry.mood == '💧' || entry.mood == '🔥') {
+      if (_isNightmareMood(entry.mood)) {
         nightmareCount++;
       } else {
         normalCount++;
@@ -28,8 +28,8 @@ class StatsScreen extends ConsumerWidget {
 
     // 2. 데이터 가공: 최근 7개 수면 시간 (sleepDuration이 -1인 항목 제외)
     final recentEntries = (diaryList.length > 7
-        ? diaryList.sublist(0, 7).reversed.toList()
-        : diaryList.reversed.toList())
+            ? diaryList.sublist(0, 7).reversed.toList()
+            : diaryList.reversed.toList())
         .where((entry) => entry.sleepDuration >= 0)
         .toList();
 
@@ -91,9 +91,15 @@ class StatsScreen extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildLegend(Colors.redAccent, "Nightmare (👻,💧)"),
+                      _buildLegend(
+                        Colors.redAccent,
+                        "Nightmare (😢, 😡, 😱)",
+                      ),
                       const SizedBox(width: 20),
-                      _buildLegend(const Color(0xFFAABCC5), "Normal/Good"),
+                      _buildLegend(
+                        const Color(0xFFAABCC5),
+                        "Normal / Other",
+                      ),
                     ],
                   ),
 
@@ -114,7 +120,7 @@ class StatsScreen extends ConsumerWidget {
                     height: 200,
                     child: LineChart(
                       LineChartData(
-                        // ⚡ Y축 범위 고정 (0~12시간)
+                        // ⚡ Y축 범위 고정 (0~15시간)
                         minY: 0,
                         maxY: 15,
                         gridData: const FlGridData(show: false),
@@ -141,7 +147,8 @@ class StatsScreen extends ConsumerWidget {
                         ),
                         lineBarsData: [
                           LineChartBarData(
-                            spots: List.generate(recentEntries.length, (index) {
+                            spots:
+                                List.generate(recentEntries.length, (index) {
                               return FlSpot(
                                 index.toDouble(),
                                 recentEntries[index].sleepDuration,
@@ -186,7 +193,8 @@ class StatsScreen extends ConsumerWidget {
                           const SizedBox(height: 12),
                           Row(
                             children: [
-                              const Icon(Icons.bedtime, size: 20, color: Colors.deepPurple),
+                              const Icon(Icons.bedtime,
+                                  size: 20, color: Colors.deepPurple),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: RichText(
@@ -196,12 +204,17 @@ class StatsScreen extends ConsumerWidget {
                                       color: Colors.black87,
                                     ),
                                     children: [
-                                      const TextSpan(text: "Average sleep duration (last "),
-                                      TextSpan(text: "${recentEntries.length}"),
+                                      const TextSpan(
+                                          text: "Average sleep duration (last "),
+                                      TextSpan(
+                                          text:
+                                              "${recentEntries.length}"),
                                       const TextSpan(text: " days): "),
                                       TextSpan(
-                                        text: "${(recentEntries.map((e) => e.sleepDuration).reduce((a, b) => a + b) / recentEntries.length).toStringAsFixed(1)} hours",
-                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                        text:
+                                            "${(recentEntries.map((e) => e.sleepDuration).reduce((a, b) => a + b) / recentEntries.length).toStringAsFixed(1)} hours",
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold),
                                       ),
                                     ],
                                   ),
@@ -217,6 +230,19 @@ class StatsScreen extends ConsumerWidget {
               ),
             ),
     );
+  }
+
+  /// 새 이모지 기준으로 "악몽"인지 판정
+  /// - 😢 sadness
+  /// - 😡 anger
+  /// - 😱 fear
+  bool _isNightmareMood(String moodEmoji) {
+    const nightmareEmojis = {
+      '😢',
+      '😡',
+      '😱',
+    };
+    return nightmareEmojis.contains(moodEmoji);
   }
 
   Widget _buildLegend(Color color, String text) {

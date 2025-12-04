@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import 'auth_provider.dart';
 import 'auth_repository.dart';
+import 'edit_profile_screen.dart';
 import '../diary/application/user_provider.dart'; // 코인/닉네임 상태
 import '../diary/application/shop_provider.dart';
 import '../diary/presentation/shop_detail_screen.dart'; // ⚡ import 추가
@@ -196,6 +197,35 @@ class AccountScreen extends ConsumerWidget {
                           style: const TextStyle(
                             fontSize: 14,
                             color: Colors.grey,
+                          ),
+                        ),
+                        // ✨ Edit Profile 버튼 추가
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 32,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const EditProfileScreen(),
+                                ),
+                              );
+                            },
+                            style: OutlinedButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              side: const BorderSide(color: Colors.grey),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                            child: const Text(
+                              "Edit profile",
+                              style:
+                                  TextStyle(fontSize: 12, color: Colors.black),
+                            ),
                           ),
                         ),
                       ],
