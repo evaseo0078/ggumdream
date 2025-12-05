@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dart:io';
 import '../application/ocr_service.dart';
 
 class OcrCameraScreen extends ConsumerStatefulWidget {
