@@ -7,6 +7,7 @@ import '../application/diary_providers.dart';
 import '../application/user_provider.dart';
 import '../domain/diary_entry.dart';
 import 'diary_detail_screen.dart';
+import 'ocr_camera_screen.dart'; // ⚡ OCR 화면 추가
 import 'package:ggumdream/shared/widgets/wobbly_painter.dart'; // FIX: 패키지 경로로 변경
 import 'dart:ui';
 
@@ -345,7 +346,31 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
 
               const SizedBox(height: 30),
 
-              const Text("Write your dream (min 20 chars)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 255, 255, 255) )),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("Write your dream (min 20 chars)", 
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 255, 255, 255))),
+                  IconButton(
+                    icon: const Icon(Icons.camera_alt, color: Colors.white, size: 28),
+                    onPressed: () async {
+                      final result = await Navigator.push<String>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const OcrCameraScreen(),
+                        ),
+                      );
+                      
+                      if (result != null && result.isNotEmpty) {
+                        setState(() {
+                          _textController.text = result;
+                        });
+                      }
+                    },
+                    tooltip: 'OCR 사진 인식',
+                  ),
+                ],
+              ),
               const SizedBox(height: 10),
               Expanded(
   child: ClipRRect(
