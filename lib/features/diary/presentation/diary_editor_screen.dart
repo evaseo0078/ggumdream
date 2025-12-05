@@ -11,7 +11,6 @@ import 'ocr_camera_screen.dart'; // ⚡ OCR 화면 추가
 import 'package:ggumdream/shared/widgets/wobbly_painter.dart'; // FIX: 패키지 경로로 변경
 import 'dart:ui';
 
-
 class DiaryEditorScreen extends ConsumerStatefulWidget {
   final DateTime selectedDate;
   // ⚡ [추가됨] 수정할 기존 일기 (없으면 새 작성)
@@ -29,15 +28,16 @@ class DiaryEditorScreen extends ConsumerStatefulWidget {
 
 class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
   late TextEditingController _textController; // late로 변경
-  double _sleepDuration = 7.0; 
-  bool _isSleepUnknown = false; 
+  double _sleepDuration = 7.0;
+  bool _isSleepUnknown = false;
 
   @override
   void initState() {
     super.initState();
     // ⚡ [로직 추가] 기존 일기가 있으면 내용 채워넣기 (수정 모드)
     if (widget.existingEntry != null) {
-      _textController = TextEditingController(text: widget.existingEntry!.content);
+      _textController =
+          TextEditingController(text: widget.existingEntry!.content);
       if (widget.existingEntry!.sleepDuration < 0) {
         _isSleepUnknown = true;
       } else {
@@ -47,7 +47,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
       _textController = TextEditingController();
     }
   }
-  
+
   @override
   void dispose() {
     _textController.dispose();
@@ -97,7 +97,8 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     if (text.length < minLength) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Too short! Please write at least $minLength characters."),
+          content:
+              Text("Too short! Please write at least $minLength characters."),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -113,7 +114,11 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
           children: [
             CircularProgressIndicator(color: Color(0xFFAABCC5)),
             SizedBox(height: 20),
-            Text("Re-Analyzing Dream...", style: TextStyle(color: Colors.white, fontSize: 16, decoration: TextDecoration.none)),
+            Text("Re-Analyzing Dream...",
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    decoration: TextDecoration.none)),
           ],
         ),
       ),
@@ -146,7 +151,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
         summary: analysis['summary'],
         interpretation: analysis['interpretation'],
         mood: analysis['mood'] ?? "🌿",
-        sleepDuration: finalSleepDuration, 
+        sleepDuration: finalSleepDuration,
         isSold: isEditMode ? widget.existingEntry!.isSold : false, // 판매 상태 유지
       );
 
@@ -163,7 +168,9 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
       Navigator.pop(context); // 로딩 닫기
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(isEditMode ? "Diary Updated!" : "Diary Posted! +10 coins")),
+        SnackBar(
+            content: Text(
+                isEditMode ? "Diary Updated!" : "Diary Posted! +10 coins")),
       );
 
       // 상세 화면으로 이동 (새 데이터로 교체)
@@ -195,235 +202,269 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                 color: Color.fromARGB(255, 255, 255, 255),
                 fontWeight: FontWeight.bold,
                 fontFamily: 'Stencil')),
-                backgroundColor: const Color.fromARGB(255, 192, 171, 255),
+        backgroundColor: const Color.fromARGB(255, 192, 171, 255),
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFE6E6FA), // Light purple
-              Color.fromARGB(255, 168, 152, 255),
-              Color.fromARGB(255, 152, 176, 255) // Dark purple
-            ],
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusScope.of(context).unfocus(),
+        onVerticalDragStart: (_) => FocusScope.of(context).unfocus(),
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFFE6E6FA), // Light purple
+                Color.fromARGB(255, 168, 152, 255),
+                Color.fromARGB(255, 152, 176, 255) // Dark purple
+              ],
+            ),
           ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("How long did you sleep?",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 129, 129, 129))),
-              const SizedBox(height: 10),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("How long did you sleep?",
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color.fromARGB(255, 129, 129, 129))),
+                const SizedBox(height: 10),
 
-              // 수면 시간 입력 박스 (WobblyContainer 적용)
-              ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14), // 🔥 blur 강하게 적용
-        child: WobblyContainer(
-          backgroundColor: Colors.white.withOpacity(0.15), // 🔥 Glass 배경
-          borderColor: Colors.white.withOpacity(0.45),      // 🔥 Glass 테두리
-          borderRadius: 20,
-          padding: EdgeInsets.zero,
+                // 수면 시간 입력 박스 (WobblyContainer 적용)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(
+                        sigmaX: 14, sigmaY: 14), // 🔥 blur 강하게 적용
+                    child: WobblyContainer(
+                      backgroundColor:
+                          Colors.white.withOpacity(0.15), // 🔥 Glass 배경
+                      borderColor:
+                          Colors.white.withOpacity(0.45), // 🔥 Glass 테두리
+                      borderRadius: 20,
+                      padding: EdgeInsets.zero,
 
-          child: Column(
-            children: [
-              // --- 탭 버튼 영역 ---
-              Row(
-                children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: () => setState(() => _isSleepUnknown = false),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: !_isSleepUnknown
-                              ? const Color.fromARGB(255, 190, 150, 255).withOpacity(0.2) // 선택된 탭 더 밝게
-                              : const Color.fromARGB(0, 176, 149, 255),
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(20),
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          "Input Time",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: !_isSleepUnknown ? Colors.white : Colors.white70,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(
-                    width: 1,
-                    height: 40,
-                    child: VerticalDivider(color: Colors.white54),
-                  ),
-
-                  Expanded(
-                    child: InkWell(
-                      onTap: () => setState(() => _isSleepUnknown = true),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: _isSleepUnknown
-                              ? Color.fromARGB(255, 190, 150, 255).withOpacity(0.35)
-                              : Colors.transparent,
-                          borderRadius: const BorderRadius.only(
-                            topRight: Radius.circular(20),
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          "Don't Know",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: _isSleepUnknown ? Colors.white : Colors.white70,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const Divider(height: 1, thickness: 1, color: Colors.white30),
-
-              // --- 입력 값 및 슬라이더 표시 ---
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: _isSleepUnknown
-                    ? const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 10),
-                        child: Text(
-                          "Sleep duration will not be recorded.",
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      )
-                    : Column(
+                      child: Column(
                         children: [
+                          // --- 탭 버튼 영역 ---
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Icon(Icons.bedtime, color: Colors.white),
-                              Text(
-                                "${_sleepDuration.toStringAsFixed(1)} Hours",
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () =>
+                                      setState(() => _isSleepUnknown = false),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: !_isSleepUnknown
+                                          ? const Color.fromARGB(
+                                                  255, 190, 150, 255)
+                                              .withOpacity(0.2) // 선택된 탭 더 밝게
+                                          : const Color.fromARGB(
+                                              0, 176, 149, 255),
+                                      borderRadius: const BorderRadius.only(
+                                        topLeft: Radius.circular(20),
+                                      ),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      "Input Time",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: !_isSleepUnknown
+                                            ? Colors.white
+                                            : Colors.white70,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(
+                                width: 1,
+                                height: 40,
+                                child: VerticalDivider(color: Colors.white54),
+                              ),
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () =>
+                                      setState(() => _isSleepUnknown = true),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: _isSleepUnknown
+                                          ? Color.fromARGB(255, 190, 150, 255)
+                                              .withOpacity(0.35)
+                                          : Colors.transparent,
+                                      borderRadius: const BorderRadius.only(
+                                        topRight: Radius.circular(20),
+                                      ),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      "Don't Know",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: _isSleepUnknown
+                                            ? Colors.white
+                                            : Colors.white70,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                          Slider(
-                            value: _sleepDuration,
-                            min: 0,
-                            max: 16,
-                            divisions: 32,
-                            activeColor: Colors.white,
-                            inactiveColor: Colors.white30,
-                            onChanged: (value) =>
-                                setState(() => _sleepDuration = value),
+
+                          const Divider(
+                              height: 1, thickness: 1, color: Colors.white30),
+
+                          // --- 입력 값 및 슬라이더 표시 ---
+                          Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: _isSleepUnknown
+                                ? const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 10),
+                                    child: Text(
+                                      "Sleep duration will not be recorded.",
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  )
+                                : Column(
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Icon(Icons.bedtime,
+                                              color: Colors.white),
+                                          Text(
+                                            "${_sleepDuration.toStringAsFixed(1)} Hours",
+                                            style: const TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Slider(
+                                        value: _sleepDuration,
+                                        min: 0,
+                                        max: 16,
+                                        divisions: 32,
+                                        activeColor: Colors.white,
+                                        inactiveColor: Colors.white30,
+                                        onChanged: (value) => setState(
+                                            () => _sleepDuration = value),
+                                      ),
+                                    ],
+                                  ),
                           ),
                         ],
                       ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
+                    ),
+                  ),
+                ),
 
+                const SizedBox(height: 30),
 
-              const SizedBox(height: 30),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text("Write your dream (min 20 chars)",
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color.fromARGB(255, 255, 255, 255))),
+                    IconButton(
+                      icon: const Icon(Icons.camera_alt,
+                          color: Colors.white, size: 28),
+                      onPressed: () async {
+                        final result = await Navigator.push<String>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const OcrCameraScreen(),
+                          ),
+                        );
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("Write your dream (min 20 chars)", 
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 255, 255, 255))),
-                  IconButton(
-                    icon: const Icon(Icons.camera_alt, color: Colors.white, size: 28),
-                    onPressed: () async {
-                      final result = await Navigator.push<String>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const OcrCameraScreen(),
+                        if (result != null && result.isNotEmpty) {
+                          setState(() {
+                            _textController.text = result;
+                          });
+                        }
+                      },
+                      tooltip: 'OCR 사진 인식',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter:
+                          ImageFilter.blur(sigmaX: 12, sigmaY: 12), // 🔥 blur
+                      child: WobblyContainer(
+                        backgroundColor: Colors.white
+                            .withOpacity(0.3), // 🔥 Glass 투명 배경
+                        borderColor: Colors.white
+                            .withOpacity(0.5), // 🔥 은은한 흰 테두리
+                        borderRadius: 20,
+                        padding: const EdgeInsets.all(16),
+
+                        child: TextField(
+                          controller: _textController,
+                          maxLines: null,
+                          expands: true,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            height: 1.5,
+                            color: Color.fromARGB(
+                                255, 46, 46, 46), // 🔥 유리 스타일에서는 흰 글씨가 예쁨
+                          ),
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            hintText: "Describe what happened in your dream...",
+                            hintStyle: TextStyle(
+                              color: Colors.white70,
+                              fontStyle:
+                                  FontStyle.italic, // 🔥 hint도 어울리게 변경
+                            ),
+                          ),
+                          onTapOutside: (_) =>
+                              FocusScope.of(context).unfocus(),
                         ),
-                      );
-                      
-                      if (result != null && result.isNotEmpty) {
-                        setState(() {
-                          _textController.text = result;
-                        });
-                      }
-                    },
-                    tooltip: 'OCR 사진 인식',
+                      ),
+                    ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-  child: ClipRRect(
-    borderRadius: BorderRadius.circular(20),
-    child: BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12), // 🔥 blur
-      child: WobblyContainer(
-        backgroundColor: Colors.white.withOpacity(0.3), // 🔥 Glass 투명 배경
-        borderColor: Colors.white.withOpacity(0.5),      // 🔥 은은한 흰 테두리
-        borderRadius: 20,
-        padding: const EdgeInsets.all(16),
+                ),
 
-        child: TextField(
-          controller: _textController,
-          maxLines: null,
-          expands: true,
-          style: const TextStyle(
-            fontSize: 16,
-            height: 1.5,
-            color: Color.fromARGB(255, 46, 46, 46), // 🔥 유리 스타일에서는 흰 글씨가 예쁨
-          ),
-          decoration: const InputDecoration(
-            border: InputBorder.none,
-            hintText: "Describe what happened in your dream...",
-            hintStyle: TextStyle(
-              color: Colors.white70,
-              fontStyle: FontStyle.italic,   // 🔥 hint도 어울리게 변경
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    GgumButton(
+                      width: 140,
+                      text: "SAVE DRAFT",
+                      onPressed: _saveDraft,
+                    ),
+                    const SizedBox(width: 12),
+                    GgumButton(
+                      width: 120,
+                      text: widget.existingEntry != null ? "UPDATE" : "POST!",
+                      onPressed: _processAndSave,
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ),
-        ),
-      ),
-    ),
-  ),
-),
-
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  GgumButton(
-                    width: 140,
-                    text: "SAVE DRAFT",
-                    onPressed: _saveDraft,
-                  ),
-                  const SizedBox(width: 12),
-                  GgumButton(
-                    width: 120,
-                    text: widget.existingEntry != null ? "UPDATE" : "POST!",
-                    onPressed: _processAndSave,
-                  ),
-                ],
-              ),
-            ],
           ),
         ),
       ),

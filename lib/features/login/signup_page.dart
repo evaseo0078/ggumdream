@@ -26,6 +26,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
   bool _isPasswordVisible = false;
   bool _isPasswordCheckVisible = false;
   bool _isNicknameChecked = false;
+  bool _isEmailChecked = false;
 
   @override
   void dispose() {
@@ -66,6 +67,43 @@ class _SignupPageState extends ConsumerState<SignupPage> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
+  // ✅ Email 중복 확인 함수
+  Future<void> _checkEmail() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter an email.')),
+      );
+      return;
+    }
+
+    final repo = ref.read(authRepositoryProvider);
+    try {
+      final isAvailable = await repo.checkEmail(email);
+      if (!mounted) return;
+
+      if (isAvailable) {
+        setState(() {
+          _isEmailChecked = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This email is available!')),
+        );
+      } else {
+        setState(() {
+          _isEmailChecked = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This email is already taken.')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error checking email: $e')),
       );
     }
   }
@@ -213,10 +251,41 @@ class _SignupPageState extends ConsumerState<SignupPage> {
               const SizedBox(height: 16),
 
               _buildLabel("Email"),
-              _buildInput(
-                  controller: _emailCtrl,
-                  keyboardType: TextInputType.emailAddress),
-              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildInput(
+                      controller: _emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      onChanged: (val) {
+                        if (_isEmailChecked) {
+                          setState(() {
+                            _isEmailChecked = false;
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton(
+                    onPressed: _checkEmail,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isEmailChecked
+                          ? Colors.green
+                          : const Color.fromARGB(255, 216, 169, 255),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                    ),
+                    child: Text(
+                      _isEmailChecked ? "OK" : "Check",
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
 
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

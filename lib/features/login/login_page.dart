@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import  'package:ggumdream/widgets/logo_particle_animation.dart';
 
 import 'auth_provider.dart';
 
@@ -103,38 +104,41 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // 앱 로고
-                  SizedBox(
-                    width: 520,
-                    height: 170,
-                    child: Image.asset(
-                      'assets/images/GGUMDREAM_logo_white.png',
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-
-                  // 이메일
-                  SizedBox(
-                    width: 350, // Reduced width
-                    child: TextField(
-                      controller: _emailController,
-                      decoration: InputDecoration(
-                        labelText: 'Email',
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide(
-                            color: const Color.fromARGB(
-                                255, 175, 126, 255), // Change border color
-                            width: 1.5, // Adjust border width
-                          ),
+                // 앱 로고
+                SizedBox(
+  width: 50, // Increased width
+  height: 40, // Increased height
+  child: LogoParticleAnimation(
+    logoAssetPath: 'assets/images/GGUMDREAM_logo_white.png',
+    offsetX: 0,
+    offsetY: -10,
+    width: 50, // Increased width
+    height: 40, // Increased height
+    logoScale: 8.0, // Increased scale
+  ),
+),
+              
+                SizedBox(height:30),
+                // 이메일
+                SizedBox(
+                  width: 350, // Reduced width
+                  child: TextField(
+                    controller: _emailController,
+                    decoration: InputDecoration(
+                      labelText: 'Email',
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: const Color.fromARGB(255, 175, 126, 255), // Change border color
+                          width: 1.5, // Adjust border width
                         ),
-                        filled: true, // Enable background color
-                        fillColor: Color.fromARGB(255, 255, 255, 255)
-                            .withOpacity(0.3), // Set background color
                       ),
-                      keyboardType: TextInputType.emailAddress,
+                      filled: true, // Enable background color
+                      fillColor: Color.fromARGB(255, 255, 255, 255).withOpacity(0.3), // Set background color
                     ),
+                    keyboardType: TextInputType.emailAddress,
                   ),
-                  const SizedBox(height: 16),
+                ),
+                const SizedBox(height: 16),
 
                   // 비밀번호
                   SizedBox(
