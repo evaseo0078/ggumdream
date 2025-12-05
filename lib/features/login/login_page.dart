@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import  'package:ggumdream/widgets/logo_particle_animation.dart';
 
 import 'auth_provider.dart';
 
@@ -100,15 +101,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 children: [
                 // 앱 로고
                 SizedBox(
-                  width: 520,
-                  height: 170,
-                  child: Image.asset(
-                    'assets/images/GGUMDREAM_logo_white.png',
-                    fit: BoxFit.contain,
-                  ),
-                ),
-                
-
+  width: 50, // Increased width
+  height: 40, // Increased height
+  child: LogoParticleAnimation(
+    logoAssetPath: 'assets/images/GGUMDREAM_logo_white.png',
+    offsetX: 0,
+    offsetY: -10,
+    width: 50, // Increased width
+    height: 40, // Increased height
+    logoScale: 8.0, // Increased scale
+  ),
+),
+              
+                SizedBox(height:30),
                 // 이메일
                 SizedBox(
                   width: 350, // Reduced width

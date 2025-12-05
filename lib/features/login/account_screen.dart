@@ -171,12 +171,12 @@ class AccountScreen extends ConsumerWidget {
                           child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
-                              color: Colors.blue,
+                              color: Color.fromARGB(255, 255, 255, 255).withOpacity(0.7),
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
+                              border: Border.all(color: Color.fromARGB(255, 192, 171, 255), width: 1.2),
                             ),
                             child: const Icon(Icons.edit,
-                                size: 16, color: Colors.white),
+                                size: 16, color: Color.fromARGB(255, 192, 171, 255)),
                           ),
                         ),
                       ],
