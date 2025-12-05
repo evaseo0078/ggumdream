@@ -23,6 +23,10 @@ class _SignupPageState extends ConsumerState<SignupPage> {
   final _passwordCheckCtrl = TextEditingController();
 
   bool _isLoading = false;
+  bool _isPasswordVisible = false;
+  bool _isPasswordCheckVisible = false;
+  bool _isNicknameChecked = false;
+  bool _isEmailChecked = false;
 
   @override
   void dispose() {
@@ -34,6 +38,76 @@ class _SignupPageState extends ConsumerState<SignupPage> {
     super.dispose();
   }
 
+  Future<void> _checkNickname() async {
+    final nickname = _nicknameCtrl.text.trim();
+    if (nickname.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a nickname.')),
+      );
+      return;
+    }
+
+    final repo = ref.read(authRepositoryProvider);
+    try {
+      final isAvailable = await repo.checkNickname(nickname);
+
+      if (!mounted) return;
+
+      if (isAvailable) {
+        setState(() => _isNicknameChecked = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nickname is available!')),
+        );
+      } else {
+        setState(() => _isNicknameChecked = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nickname is already taken.')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
+  // ✅ Email 중복 확인 함수
+  Future<void> _checkEmail() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter an email.')),
+      );
+      return;
+    }
+
+    final repo = ref.read(authRepositoryProvider);
+    try {
+      final isAvailable = await repo.checkEmail(email);
+      if (!mounted) return;
+
+      if (isAvailable) {
+        setState(() {
+          _isEmailChecked = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This email is available!')),
+        );
+      } else {
+        setState(() {
+          _isEmailChecked = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This email is already taken.')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error checking email: $e')),
+      );
+    }
+  }
+
   Future<void> _onSignupPressed() async {
     final name = _nameCtrl.text.trim();
     final nickname = _nicknameCtrl.text.trim();
@@ -41,44 +115,32 @@ class _SignupPageState extends ConsumerState<SignupPage> {
     final password = _passwordCtrl.text.trim();
     final passwordCheck = _passwordCheckCtrl.text.trim();
 
-    // --- 기본 입력 검사 ---
     if (name.isEmpty ||
         nickname.isEmpty ||
         email.isEmpty ||
         password.isEmpty ||
         passwordCheck.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields.')),
-      );
-      return;
-    }
-
-    if (password.length < 8) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password must be at least 8 characters long.')),
-      );
+          const SnackBar(content: Text('Please fill in all fields.')));
       return;
     }
 
     if (password != passwordCheck) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Passwords do not match.')),
-      );
+          const SnackBar(content: Text('Passwords do not match.')));
       return;
     }
 
-    final emailRegExp = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
-    if (!emailRegExp.hasMatch(email)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid email address.')),
-      );
+    if (password.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Password must be at least 6 characters.')));
       return;
     }
 
     setState(() => _isLoading = true);
-    final repo = ref.read(authRepositoryProvider);
 
     try {
+      final repo = ref.read(authRepositoryProvider);
       await repo.signUp(
         name: name,
         nickname: nickname,
@@ -87,75 +149,50 @@ class _SignupPageState extends ConsumerState<SignupPage> {
       );
 
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sign-up completed. Please log in.')),
-      );
-
-      // 로그인 화면으로 이동
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Sign up successful!')));
       context.go('/login');
     } on NicknameAlreadyUsedException {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This nickname is already in use. Please enter a different nickname.'),
-        ),
-      );
+          const SnackBar(content: Text('Nickname is already in use.')));
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-
-      String message;
-      switch (e.code) {
-        case 'email-already-in-use':
-          message = 'This email is already in use.';
-          break;
-        case 'weak-password':
-          message = 'The password is too weak. Please use at least 6 characters.';
-          break;
-        case 'invalid-email':
-          message = 'The email format is invalid.';
-          break;
-        default:
-          message = e.message ?? 'Sign-up failed. Please try again later.';
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message ?? 'Sign up failed')));
     } catch (e) {
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('An unknown error occurred. Please try again later.'),
-        ),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // ✅ 오버플로우 방지를 위해 이 속성을 추가/수정했습니다.
-      // SingleChildScrollView가 스크롤을 전담하도록 만듭니다.
-      resizeToAvoidBottomInset: false,
-
+      resizeToAvoidBottomInset: true,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: const Color.fromARGB(255, 255, 237, 253),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: const BackButton(color: Color.fromARGB(255, 216, 169, 255)),
         title: const Text(
           "Make your new Account",
-          style: TextStyle(color: Color.fromARGB(255, 216, 169, 255), fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Color.fromARGB(255, 216, 169, 255),
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
-      body: Container(
-        height: double.infinity, // Ensure the gradient fills the entire screen
-        decoration: const BoxDecoration(
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(), // ⚡ 화면 탭 시 키보드 내리기
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -169,84 +206,152 @@ class _SignupPageState extends ConsumerState<SignupPage> {
           ),
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 20),
+              SizedBox(
+                  height:
+                      kToolbarHeight + MediaQuery.of(context).padding.top + 20),
 
               _buildLabel("Name"),
               _buildInput(controller: _nameCtrl),
               const SizedBox(height: 16),
-              
 
               _buildLabel("Nickname"),
-              _buildInput(controller: _nicknameCtrl),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildInput(
+                      controller: _nicknameCtrl,
+                      onChanged: (val) {
+                        if (_isNicknameChecked)
+                          setState(() => _isNicknameChecked = false);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _checkNickname,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isNicknameChecked
+                          ? Colors.green
+                          : const Color.fromARGB(255, 185, 154, 255),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 12),
+                    ),
+                    child: Text(_isNicknameChecked ? "OK" : "Check",
+                        style: const TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
 
               _buildLabel("Email"),
-              _buildInput(
-                controller: _emailCtrl,
-                keyboardType: TextInputType.emailAddress,
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildInput(
+                      controller: _emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      onChanged: (val) {
+                        if (_isEmailChecked) {
+                          setState(() {
+                            _isEmailChecked = false;
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton(
+                    onPressed: _checkEmail,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isEmailChecked
+                          ? Colors.green
+                          : const Color.fromARGB(255, 216, 169, 255),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                    ),
+                    child: Text(
+                      _isEmailChecked ? "OK" : "Check",
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
 
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: const [
-                  Text(
-                    "Password",
-                    style: TextStyle(fontSize: 16, color: Colors.black54),
-                  ),
-                  Text(
-                    "Insert more than 8 letters",
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
+                  Text("Password",
+                      style: TextStyle(fontSize: 16, color: Colors.black54)),
+                  Text("Insert more than 6 letters",
+                      style: TextStyle(color: Colors.grey, fontSize: 12)),
                 ],
               ),
               const SizedBox(height: 8),
-
               _buildInput(
                 controller: _passwordCtrl,
-                obscureText: true,
+                obscureText: !_isPasswordVisible,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                      _isPasswordVisible
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                      color: Colors.grey),
+                  onPressed: () =>
+                      setState(() => _isPasswordVisible = !_isPasswordVisible),
+                ),
               ),
               const SizedBox(height: 16),
 
               _buildLabel("Password Check"),
               _buildInput(
                 controller: _passwordCheckCtrl,
-                obscureText: true,
+                obscureText: !_isPasswordCheckVisible,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                      _isPasswordCheckVisible
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                      color: Colors.grey),
+                  onPressed: () => setState(
+                      () => _isPasswordCheckVisible = !_isPasswordCheckVisible),
+                ),
               ),
-
               const SizedBox(height: 40),
 
+              // ✅ [수정] 이 부분이 에러의 원인이었을 것입니다.
+              // null 체크와 함수 호출 방식을 안전하게 변경했습니다.
               GgumButton(
                 text: _isLoading ? "..." : "sign up",
-                onPressed: () {
-                  if (_isLoading) return;
-                  _onSignupPressed();
-                },
+                onPressed: _isLoading
+                    ? null
+                    : () {
+                        _onSignupPressed();
+                      },
               ),
-
-              const SizedBox(height: 24),
-
-              // ✅ 작은 오버플로우를 해결하기 위해 하단 여백을 추가했습니다.
-              const SizedBox(height: 30),
+              const SizedBox(height: 54),
             ],
           ),
+        ),
         ),
       ),
     );
   }
 
-
   Widget _buildLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4.0, left: 4),
-      child: Text(
-        text,
-        style: const TextStyle(fontSize: 16, color: Colors.black54),
-      ),
+      child: Text(text,
+          style: const TextStyle(fontSize: 16, color: Colors.black54)),
     );
   }
 
@@ -254,6 +359,8 @@ class _SignupPageState extends ConsumerState<SignupPage> {
     required TextEditingController controller,
     bool obscureText = false,
     TextInputType keyboardType = TextInputType.text,
+    Widget? suffixIcon,
+    Function(String)? onChanged,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -265,10 +372,12 @@ class _SignupPageState extends ConsumerState<SignupPage> {
         controller: controller,
         obscureText: obscureText,
         keyboardType: keyboardType,
-        decoration: const InputDecoration(
+        onChanged: onChanged,
+        decoration: InputDecoration(
           border: InputBorder.none,
           contentPadding:
-              EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          suffixIcon: suffixIcon,
         ),
       ),
     );

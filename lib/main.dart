@@ -8,6 +8,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'app/router.dart';
 import 'app/theme.dart';
 import 'firebase_options.dart';
+import 'shared/widgets/connectivity_overlay.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,6 +40,9 @@ class MyApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.theme,
       routerConfig: router,
+      builder: (context, child) => ConnectivityOverlay(
+        child: child ?? const SizedBox.shrink(),
+      ),
     );
   }
 }
