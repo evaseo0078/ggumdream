@@ -52,19 +52,32 @@ class DiaryEntry {
   // ------------------------------------------------------------
   // ✅ Dream day 계산 (cutoff 18:00)
   // - "꿈 기록이 붙는 날짜" 기준
+  //
+  // ✅ 핵심:
+  // 1) 수면 구간이 있으면 sleepEndAt(기상 시각)을 기준으로 날짜 판단
+  //    -> 6일 23-07 입력 시
+  //       실제 interval: 5일 23:00 ~ 6일 07:00 저장이어도
+  //       꿈 기록/마커는 6일에 붙게 유도 가능
+  //
+  // 2) 날짜-only(00:00:00)는 보정 금지
   // ------------------------------------------------------------
   DateTime logicalDay({int cutoffHour = 18}) {
-    final d = date;
-    final base = DateTime(d.year, d.month, d.day);
+    // ✅ 수면 구간이 있으면 "기상 시각"을 우선 기준으로
+    final ref = sleepEndAt ?? date;
 
-    final hasTimeInfo =
-        d.hour != 0 || d.minute != 0 || d.second != 0 || d.millisecond != 0;
+    final base = DateTime(ref.year, ref.month, ref.day);
 
-    // 날짜만 저장된 값이면 그대로 사용
-    if (!hasTimeInfo) return base;
+    // ✅ 날짜-only 판단 (캘린더에서 선택한 날짜가 여기에 해당)
+    final isDateOnly = ref.hour == 0 &&
+        ref.minute == 0 &&
+        ref.second == 0 &&
+        ref.millisecond == 0 &&
+        ref.microsecond == 0;
 
-    // 18:00 이전이면 전날 dream day
-    if (d.hour < cutoffHour) {
+    if (isDateOnly) return base;
+
+    // ✅ 일반 케이스만 cutoff 적용
+    if (ref.hour < cutoffHour) {
       return base.subtract(const Duration(days: 1));
     }
     return base;
@@ -79,16 +92,15 @@ class DiaryEntry {
   //   5일 23:00 ~ 6일 07:00 으로 저장되더라도
   //   "6일 logical day에 붙게"
   //
-  // => 즉, sleepEndAt(기상 시각)의 날짜를 기준으로 붙이는 방식
+  // => sleepEndAt(기상 시각)의 날짜를 기준으로 고정
   // ------------------------------------------------------------
   DateTime sleepLogicalDay({int cutoffHour = 18}) {
-    // 기상 시간이 있으면 그 날짜에 붙인다
     if (sleepEndAt != null) {
       final e = sleepEndAt!;
       return DateTime(e.year, e.month, e.day);
     }
 
-    // fallback: date 기준
+    // fallback: date 기준 (날짜-only면 그대로)
     final d = date;
     return DateTime(d.year, d.month, d.day);
   }

@@ -50,6 +50,24 @@ class DiaryDetailScreen extends ConsumerWidget {
   }) : assert(entry != null || entryId != null);
 
   // ------------------------------------------------------------
+  // ✅ Stats/Calendar와 동일한 dream-day cutoff
+  // ------------------------------------------------------------
+  static const int _cutoffHour = 18;
+
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  /// ✅ 디테일 "표시용 날짜"
+  /// - 캘린더에서 이모지가 붙는 기준과 맞추기 위해
+  ///   sleepEndAt(기상일) 우선
+  /// - 없으면 dream logicalDay(cutoff=18)
+  DateTime _displayDayForHeader(DiaryEntry e) {
+    if (e.sleepEndAt != null) {
+      return _dateOnly(e.sleepEndAt!);
+    }
+    return _dateOnly(e.logicalDay(cutoffHour: _cutoffHour));
+  }
+
+  // ------------------------------------------------------------
   // ✅ Sleep label helper
   // ------------------------------------------------------------
   String _formatHm(DateTime dt) => DateFormat('HH:mm').format(dt);
@@ -70,7 +88,8 @@ class DiaryDetailScreen extends ConsumerWidget {
     final s = e.sleepStartAt!;
     final ed = e.sleepEndAt!;
 
-    return "Sleep: ${e.sleepDuration.toStringAsFixed(1)} h (${_formatHm(s)}-${_formatHm(ed)})";
+    return "Sleep: ${e.sleepDuration.toStringAsFixed(1)} h "
+        "(${_formatHm(s)}-${_formatHm(ed)})";
   }
 
   @override
@@ -107,7 +126,10 @@ class DiaryDetailScreen extends ConsumerWidget {
     }
 
     final e = resolvedEntry;
-    final dateStr = DateFormat('yyyy.MM.dd (E)').format(e.date);
+
+    // ✅ 디테일에서 보여줄 날짜는 캘린더 기준과 동일하게
+    final headerDay = _displayDayForHeader(e);
+    final dateStr = DateFormat('yyyy.MM.dd (E)').format(headerDay);
 
     return Scaffold(
       appBar: AppBar(
@@ -129,6 +151,8 @@ class DiaryDetailScreen extends ConsumerWidget {
                 context,
                 MaterialPageRoute(
                   builder: (_) => DiaryEditorScreen(
+                    // ✅ 편집의 기준 날짜는 "원본 date" 그대로 유지
+                    // (저장 구조 흔들지 않기)
                     selectedDate: e.date,
                     existingEntry: e,
                   ),
@@ -180,7 +204,7 @@ class DiaryDetailScreen extends ConsumerWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                dateStr,
+                                dateStr, // ✅ AppBar와 동일 표시 날짜
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,

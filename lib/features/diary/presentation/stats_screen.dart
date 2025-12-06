@@ -20,7 +20,7 @@ class StatsScreen extends ConsumerStatefulWidget {
 class _StatsScreenState extends ConsumerState<StatsScreen> {
   NightmareRange _range = NightmareRange.d30;
 
-  // ✅ dream-day cutoff (Nightmare/Diary 쪽에만 의미)
+  // ✅ dream-day cutoff (Nightmare/Diary 논리용)
   static const int _cutoffHour = 18;
 
   // ✅ 24H axis
@@ -76,21 +76,31 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
 
     // ---------------------------
     // 2) Sleep Period Chart
-    // ✅ 여기서는 "수면"을 더 직관적으로:
-    //    - 최근 7일 "캘린더 날짜" 기준
-    //    - 구간이 있으면 "기상일(sleepEndAt)" 기준으로 날짜에 붙임
+    //
+    // ✅ 너가 싫어한 현상 해결 포인트:
+    //    "전날 23~24가 오늘에 그어지는 문제"
+    //
+    // => Stats에서는 "기상일 기준"이 아니라
+    //    "캘린더 날짜 기준으로 interval을 쪼개서" 붙인다.
+    //
+    // 예)
+    // 12/6에 23~07 입력되어 실제 저장이
+    // 12/5 23:00 ~ 12/6 07:00 이면
+    //
+    // 12/5 막대: 23~24
+    // 12/6 막대: 00~07
     // ---------------------------
     final todayKey = _dateOnly(now);
     final last7Days = _lastNDays(todayKey, 7); // 오래된 → 최신
 
-    final intervalsByDay = _sleepIntervalsByWakeDay(
+    final intervalsByDay = _sleepIntervalsByCalendarDay(
       diaryList,
       last7Days,
     );
 
     final dailyDurations = last7Days.map((d) {
       final key = _dateOnly(d);
-      return _sumSleepDurationForWakeDay(diaryList, key);
+      return _sumSleepDurationForCalendarDay(intervalsByDay, key);
     }).toList();
 
     double avgSleep7 = 0;
@@ -161,8 +171,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                               totalDreams == 0
                                   ? "Nightmares: 0.0%"
                                   : "Nightmares: ${(nightmareCount / totalDreams * 100).toStringAsFixed(1)}%",
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold),
+                              style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 6),
                             Text(
@@ -175,8 +184,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                             const SizedBox(height: 12),
                             Row(
                               children: [
-                                _legendDot(
-                                    const Color.fromARGB(255, 94, 82, 82)),
+                                _legendDot(const Color.fromARGB(255, 94, 82, 82)),
                                 const SizedBox(width: 6),
                                 const Text("Nightmare (😢, 😡, 😱)"),
                               ],
@@ -202,11 +210,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                             sections: [
                               PieChartSectionData(
                                 value: nightmareCount.toDouble(),
-                                color:
-                                    const Color.fromARGB(255, 94, 82, 82),
-                                title: nightmareCount == 0
-                                    ? ''
-                                    : '$nightmareCount',
+                                color: const Color.fromARGB(255, 94, 82, 82),
+                                title: nightmareCount == 0 ? '' : '$nightmareCount',
                                 radius: 50,
                                 titleStyle: const TextStyle(
                                   fontSize: 16,
@@ -217,8 +222,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                               PieChartSectionData(
                                 value: normalCount.toDouble(),
                                 color: const Color(0xFFAABCC5),
-                                title:
-                                    normalCount == 0 ? '' : '$normalCount',
+                                title: normalCount == 0 ? '' : '$normalCount',
                                 radius: 50,
                                 titleStyle: const TextStyle(
                                   fontSize: 16,
@@ -288,8 +292,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   // -----------------------------------------------------
   // ✅ Sleep range chart (multi-interval)
   // - 24H 축
-  // - 자정 넘기는 구간은 2개로 분리
-  // - 세로 점선(세로 그리드) 제거
+  // - 자정 넘기는 구간은 2개로 분리해서 표시
+  // - 세로 점선 제거
   // -----------------------------------------------------
   Widget _buildSleepRangeChart({
     required List<DateTime> days,
@@ -315,7 +319,6 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         );
       }
 
-      // ✅ 24h 축 표현을 위한 "구간 분해"
       final segments = <({double start, double end})>[];
 
       for (final itv in intervals) {
@@ -330,7 +333,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
             end: e.clamp(_minY, _maxY).toDouble(),
           ));
         } else {
-          // ✅ 자정 넘김: (s~24) + (0~e)
+          // ✅ 자정 넘김 표현
           segments.add((
             start: s.clamp(_minY, _maxY).toDouble(),
             end: _maxY,
@@ -344,7 +347,6 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
 
       segments.sort((a, b) => a.start.compareTo(b.start));
 
-      // rodStackItems 구성
       final stacks = <BarChartRodStackItem>[];
       double cursor = _minY;
 
@@ -352,8 +354,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         if (seg.end <= seg.start) continue;
 
         if (seg.start > cursor) {
-          stacks.add(
-              BarChartRodStackItem(cursor, seg.start, Colors.transparent));
+          stacks.add(BarChartRodStackItem(cursor, seg.start, Colors.transparent));
         }
 
         stacks.add(
@@ -389,7 +390,6 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         minY: _minY,
         maxY: _maxY,
 
-        // ✅ 세로 점선 제거
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
@@ -407,11 +407,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 40,
-
-              // ✅ 3시간 단위 표시
               getTitlesWidget: (value, meta) {
                 final v = value.round();
-
                 if (v % 3 != 0) return const SizedBox.shrink();
                 if (v < 0 || v > 24) return const SizedBox.shrink();
 
@@ -482,27 +479,11 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   }
 
   // -----------------------------------------------------
-  // ✅ 수면 날짜 키 결정
-  // - 구간이 있으면 "기상일(sleepEndAt 날짜)" 기준으로 붙임
-  // - 없으면 기존 dream-day 기준 fallback
-  // -----------------------------------------------------
-  DateTime _sleepDayKey(DiaryEntry e) {
-    final sAt = e.sleepStartAt;
-    final eAt = e.sleepEndAt;
-
-    if (sAt != null && eAt != null) {
-      return _dateOnly(eAt);
-    }
-
-    return _dateOnly(e.logicalDay(cutoffHour: _cutoffHour));
-  }
-
-  // -----------------------------------------------------
-  // ✅ 날짜별 수면 구간 리스트 집계
+  // ✅ 핵심 변경: 캘린더 날짜 기준 수면 구간 집계
   // - sleepStartAt/sleepEndAt 기반
-  // - "기상일 기준"으로 날짜에 붙임
+  // - 자정 넘기면 실제 날짜로 2개로 나눠서 각 날짜에 배치
   // -----------------------------------------------------
-  Map<DateTime, List<({double start, double end})>> _sleepIntervalsByWakeDay(
+  Map<DateTime, List<({double start, double end})>> _sleepIntervalsByCalendarDay(
     List<DiaryEntry> entries,
     List<DateTime> days,
   ) {
@@ -515,34 +496,49 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       final eAt = e.sleepEndAt;
       if (sAt == null || eAt == null) continue;
 
-      final dayKey = _sleepDayKey(e);
-      if (!map.containsKey(dayKey)) continue;
+      final sKey = _dateOnly(sAt);
+      final eKey = _dateOnly(eAt);
 
-      final s = _hourOfDay(sAt);
-      final ed = _hourOfDay(eAt);
+      final sHour = _hourOfDay(sAt);
+      final eHour = _hourOfDay(eAt);
 
-      map[dayKey]!.add((start: s, end: ed));
+      // ✅ 같은 날짜면 그대로
+      if (sKey == eKey) {
+        if (map.containsKey(sKey)) {
+          map[sKey]!.add((start: sHour, end: eHour));
+        }
+        continue;
+      }
+
+      // ✅ 자정 넘김: 2조각으로 분할
+      // 1) 시작 날짜: sHour ~ 24
+      if (map.containsKey(sKey)) {
+        map[sKey]!.add((start: sHour, end: _maxY));
+      }
+
+      // 2) 종료 날짜: 0 ~ eHour
+      if (map.containsKey(eKey)) {
+        map[eKey]!.add((start: _minY, end: eHour));
+      }
     }
 
     return map;
   }
 
   // -----------------------------------------------------
-  // ✅ "기상일 기준" sleepDuration 합산
-  // - unknown(-1), 0 제외
+  // ✅ intervalsByDay 기반 "그 날짜" 수면 총합
   // -----------------------------------------------------
-  double _sumSleepDurationForWakeDay(
-    List<DiaryEntry> entries,
+  double _sumSleepDurationForCalendarDay(
+    Map<DateTime, List<({double start, double end})>> intervalsByDay,
     DateTime dayKey,
   ) {
+    final intervals = intervalsByDay[dayKey] ?? const [];
     double sum = 0.0;
 
-    for (final e in entries) {
-      final eKey = _sleepDayKey(e);
-      if (eKey != dayKey) continue;
-
-      if (e.sleepDuration <= 0) continue;
-      sum += e.sleepDuration;
+    for (final itv in intervals) {
+      final s = itv.start;
+      final e = itv.end;
+      if (e > s) sum += (e - s);
     }
 
     return sum;

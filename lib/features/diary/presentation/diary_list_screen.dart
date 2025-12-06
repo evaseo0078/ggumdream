@@ -2,6 +2,7 @@
 
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -65,6 +66,21 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
   static const int _cutoffHour = 18;
 
   // ------------------------
+  // ✅ 날짜 유틸
+  // ------------------------
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  /// ✅ 캘린더/마커/필터의 "단일 진실 기준"
+  /// - 1순위: sleepEndAt(기상일)
+  /// - 2순위: dream logicalDay(cutoff=18)
+  DateTime _calendarDayKey(DiaryEntry e) {
+    if (e.sleepEndAt != null) {
+      return _dateOnly(e.sleepEndAt!);
+    }
+    return _dateOnly(e.logicalDay(cutoffHour: _cutoffHour));
+  }
+
+  // ------------------------
   // ✅ Sleep 표시 헬퍼
   // ------------------------
   String _sleepText(DiaryEntry e) {
@@ -79,11 +95,12 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     return "Sleep: ${e.sleepDuration.toStringAsFixed(1)} h";
   }
 
-  // ✅ 캘린더 모드일 때 카드 날짜는 항상 logicalDay 기준으로 보여주기
-  // (선택 여부와 무관하게 통일)
+  /// ✅ 카드 날짜 표시 기준
+  /// - 캘린더 모드에서는 "캘린더 마커 기준과 동일"
+  /// - 리스트/그리드는 기존 date 유지
   DateTime _displayDateForCard(DiaryEntry e) {
     if (_viewMode == ViewMode.calendar) {
-      return e.logicalDay(cutoffHour: _cutoffHour);
+      return _calendarDayKey(e);
     }
     return e.date;
   }
@@ -92,15 +109,17 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
   Widget build(BuildContext context) {
     final diaryList = ref.watch(diaryListProvider);
 
-    // 📌 캘린더 모드에서 특정 날짜 선택 시: logicalDay(cutoff=18) 기준으로 필터링
-    final displayList = (_viewMode == ViewMode.calendar && _selectedDay != null)
-        ? diaryList
-            .where((entry) => isSameDay(
-                  entry.logicalDay(cutoffHour: _cutoffHour),
-                  _selectedDay,
-                ))
-            .toList()
-        : diaryList;
+    // ✅ 캘린더 모드 + 날짜 선택 시:
+    // "sleepEndAt 우선" 캘린더 기준으로 필터링
+    final displayList =
+        (_viewMode == ViewMode.calendar && _selectedDay != null)
+            ? diaryList
+                .where((entry) => isSameDay(
+                      _calendarDayKey(entry),
+                      _selectedDay,
+                    ))
+                .toList()
+            : diaryList;
 
     return Scaffold(
       body: Stack(
@@ -217,13 +236,12 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                             selectedDayPredicate: (day) =>
                                 isSameDay(_selectedDay, day),
 
-                            // ⚡ 이벤트 로더: logicalDay(cutoff=18) 기준
+                            // ✅ 이벤트 로더:
+                            // "sleepEndAt 우선" 캘린더 기준으로 이벤트 매칭
                             eventLoader: (day) {
                               return diaryList
                                   .where((entry) => isSameDay(
-                                        entry.logicalDay(
-                                          cutoffHour: _cutoffHour,
-                                        ),
+                                        _calendarDayKey(entry),
                                         day,
                                       ))
                                   .toList();
@@ -300,7 +318,6 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                               markerBuilder: (context, date, events) {
                                 if (events.isEmpty) return null;
 
-                                // events -> DiaryEntry 리스트로 안전하게 캐스팅
                                 final diaryEntries =
                                     events.whereType<DiaryEntry>().toList();
                                 if (diaryEntries.isEmpty) return null;
@@ -308,7 +325,6 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                                 final moods =
                                     diaryEntries.map((e) => e.mood).toList();
 
-                                // 최대 2개까지 표시, 그 이상이면 + 추가
                                 final displayMoods = moods.take(2).toList();
                                 final hasMore = moods.length > 2;
 
@@ -343,9 +359,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                     ),
                   ),
 
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 10),
-                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
                 // 리스트 / 그리드 / 비어있을 때
                 if (displayList.isEmpty)
@@ -377,10 +391,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                       ),
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
-                          return _buildGridItem(
-                            context,
-                            displayList[index],
-                          );
+                          return _buildGridItem(context, displayList[index]);
                         },
                         childCount: displayList.length,
                       ),
@@ -415,6 +426,8 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
           ),
         ],
       ),
+
+      // FABs
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
@@ -423,9 +436,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const StatsScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const StatsScreen()),
               );
             },
             child: ClipRRect(
@@ -453,6 +464,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             ),
           ),
           const SizedBox(height: 16),
+
           // 작성 버튼
           GestureDetector(
             onTap: () {
@@ -499,7 +511,10 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
   // ------------------------
 
   Widget _buildDiaryCard(
-      BuildContext context, WidgetRef ref, DiaryEntry entry) {
+    BuildContext context,
+    WidgetRef ref,
+    DiaryEntry entry,
+  ) {
     if (entry.isDraft) {
       return _buildDraftCard(context, ref, entry);
     }
@@ -513,7 +528,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             item.diaryId == entry.id &&
             item.ownerName == ref.read(userProvider).username,
       );
-    } catch (e) {
+    } catch (_) {
       matchingShopItem = null;
     }
 
@@ -627,8 +642,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: isSoldOut
-                                      ? const Color.fromARGB(
-                                          255, 255, 255, 255)
+                                      ? const Color.fromARGB(255, 255, 255, 255)
                                       : (isListed
                                           ? const Color.fromRGBO(
                                               255, 209, 150, 1)
@@ -663,7 +677,10 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
   }
 
   Widget _buildDraftCard(
-      BuildContext context, WidgetRef ref, DiaryEntry entry) {
+    BuildContext context,
+    WidgetRef ref,
+    DiaryEntry entry,
+  ) {
     final displayDate = _displayDateForCard(entry);
     final dateText = DateFormat('yyyy.MM.dd').format(displayDate);
 
@@ -673,7 +690,6 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
           context,
           MaterialPageRoute(
             builder: (context) => DiaryEditorScreen(
-              // ✅ 드래프트 편집 진입 시에도 logical day 기준으로 날짜 전달
               selectedDate: entry.logicalDay(cutoffHour: _cutoffHour),
               existingEntry: entry,
             ),
@@ -804,10 +820,8 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                 top: 4,
                 right: 4,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.orange,
                     borderRadius: BorderRadius.circular(4),
@@ -872,7 +886,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             item.diaryId == entry.id &&
             item.ownerName == ref.read(userProvider).username,
       );
-    } catch (e) {
+    } catch (_) {
       matchingShopItem = null;
     }
 
@@ -1005,7 +1019,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                         vertical: 12,
                       ),
                     ),
-                    onChanged: (value) {
+                    onChanged: (_) {
                       if (errorText != null) {
                         setState(() => errorText = null);
                       }
@@ -1049,7 +1063,10 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
   }
 
   void _showEditOptions(
-      BuildContext context, WidgetRef ref, DiaryEntry entry) {
+    BuildContext context,
+    WidgetRef ref,
+    DiaryEntry entry,
+  ) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -1151,7 +1168,10 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
   // ------------------------
 
   void _confirmDelete(
-      BuildContext context, WidgetRef ref, String entryId) {
+    BuildContext context,
+    WidgetRef ref,
+    String entryId,
+  ) {
     showDialog(
       context: context,
       builder: (dialogContext) {
