@@ -63,6 +63,7 @@ dependencies:
   flutter_dotenv: ^5.1.0 # API 키 보안 관리
   image_picker: ^1.0.7 # 이미지 선택
   google_mlkit_text_recognition: ^0.13.1 # Google ML Kit OCR
+  flutter_image_compress: ^2.4.0
   #-----------------------------------------
 
 dev_dependencies:
