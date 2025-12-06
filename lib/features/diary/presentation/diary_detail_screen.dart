@@ -11,7 +11,9 @@ import '../application/diary_providers.dart';
 import '../../../shared/widgets/full_screen_image_viewer.dart';
 import 'diary_editor_screen.dart';
 
-/// 공통으로 쓰는 glass 카드
+/// ---------------------------------------------------------------------------
+/// 공통 Glass 카드 (함수형 위젯)
+/// ---------------------------------------------------------------------------
 Widget glassCard({
   required Widget child,
   double radius = 20,
@@ -152,7 +154,6 @@ class DiaryDetailScreen extends ConsumerWidget {
                 MaterialPageRoute(
                   builder: (_) => DiaryEditorScreen(
                     // ✅ 편집의 기준 날짜는 "원본 date" 그대로 유지
-                    // (저장 구조 흔들지 않기)
                     selectedDate: e.date,
                     existingEntry: e,
                   ),
@@ -178,78 +179,15 @@ class DiaryDetailScreen extends ConsumerWidget {
             ],
           ),
         ),
-<<<<<<< HEAD
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 5), // 이미지와 Summary 텍스트의 시작점을 맞추기 위해 추가
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      if (e.imageUrl != null) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => FullScreenImageViewer(
-                              imageUrl: e.imageUrl!,
-                              tag: 'diaryImage_${e.id}',
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                    child: Hero(
-                      tag: 'diaryImage_${e.id}',
-                      child: Container(
-                        width: 180,
-                        height: 180,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(8),
-                          image: e.imageUrl != null
-                              ? DecorationImage(image: NetworkImage(e.imageUrl!), fit: BoxFit.cover)
-                              : null,
-                        ),
-                        child: e.imageUrl == null ? const Icon(Icons.image, color: Colors.grey) : null,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "Summary",
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                        const SizedBox(height: 7),
-                        GlassCard(
-                          radius: 8,
-                          opacity: 0.2,
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              e.summary ?? "No summary",
-                              style: const TextStyle(fontSize: 15),
-                            ),
-=======
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // 상단 카드: 날짜 + 기분 + 수면시간
+                // ------------------------------------------------------------
+                // 상단 카드: 기분 + 날짜 + 수면시간
+                // ------------------------------------------------------------
                 glassCard(
                   radius: 22,
                   child: Padding(
@@ -269,7 +207,7 @@ class DiaryDetailScreen extends ConsumerWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                dateStr, // ✅ AppBar와 동일 표시 날짜
+                                dateStr,
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -277,8 +215,6 @@ class DiaryDetailScreen extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(height: 4),
-
-                              // ✅ 변경된 Sleep 표기
                               Text(
                                 _sleepHeaderText(e),
                                 style: const TextStyle(
@@ -287,60 +223,18 @@ class DiaryDetailScreen extends ConsumerWidget {
                                 ),
                               ),
                             ],
->>>>>>> stats-detail
                           ),
                         ),
                       ],
                     ),
                   ),
-<<<<<<< HEAD
-                ],
-              ),
-              
-              const SizedBox(height: 20),
-              
-              const Text(
-                "Interpretation",
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
-              ),
-              const SizedBox(height: 7),
-              GlassCard(
-                radius: 8,
-                opacity: 0.2,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    e.interpretation ?? "No interpretation",
-                    style: const TextStyle(fontSize: 14, height: 1.5),
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 30),
-              
-              const Text("My Dream", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color.fromARGB(255, 255, 255, 255))),
-              const SizedBox(height: 8),
-              GlassCard(
-                radius: 8,
-                opacity: 0.2,
-                child: Container(
-                  width: double.infinity,
-                  constraints: const BoxConstraints(minHeight: 200),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.25),
-                    borderRadius: BorderRadius.circular(8),
-=======
                 ),
 
                 const SizedBox(height: 20),
 
+                // ------------------------------------------------------------
                 // 이미지 카드
+                // ------------------------------------------------------------
                 if (e.imageUrl != null)
                   glassCard(
                     radius: 22,
@@ -379,12 +273,13 @@ class DiaryDetailScreen extends ConsumerWidget {
                         ),
                       ),
                     ),
->>>>>>> stats-detail
                   ),
 
                 if (e.imageUrl != null) const SizedBox(height: 20),
 
+                // ------------------------------------------------------------
                 // 요약 / 해석 카드
+                // ------------------------------------------------------------
                 if (e.summary != null || e.interpretation != null)
                   glassCard(
                     radius: 22,
@@ -436,7 +331,9 @@ class DiaryDetailScreen extends ConsumerWidget {
                 if (e.summary != null || e.interpretation != null)
                   const SizedBox(height: 20),
 
+                // ------------------------------------------------------------
                 // 원문 내용 카드
+                // ------------------------------------------------------------
                 glassCard(
                   radius: 22,
                   child: Padding(
@@ -492,7 +389,7 @@ class DiaryDetailScreen extends ConsumerWidget {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text("Diary deleted.")),
               );
-              Navigator.pop(context); // detail 화면 닫기
+              Navigator.pop(context);
             },
             child: const Text(
               "Delete",
