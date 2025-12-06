@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../shop/domain/shop_item.dart';
+
+const int kDefaultCoins = 1000;
 
 class UserState {
   final String username;
@@ -20,19 +23,24 @@ class UserState {
     this.salesHistory = const [],
   });
 
-  factory UserState.initial() =>
-      const UserState(username: 'Dreamer', userId: '', coins: 0);
+  factory UserState.initial() => const UserState(
+        username: 'Dreamer',
+        userId: '',
+        coins: kDefaultCoins,
+      );
 
   factory UserState.fromFirestore(String uid, Map<String, dynamic> data) {
+    final coinsRaw = data['coins'];
+
     return UserState(
       username: data['nickname'] as String? ??
           data['name'] as String? ??
           data['email'] as String? ??
           'Dreamer',
       userId: uid,
-      coins: (data['coins'] is num) ? (data['coins'] as num).toInt() : 0,
-      purchaseHistory: [], // TODO: Load from Firestore if needed
-      salesHistory: [], // TODO: Load from Firestore if needed
+      coins: (coinsRaw is num) ? coinsRaw.toInt() : kDefaultCoins,
+      purchaseHistory: [], // TODO
+      salesHistory: [], // TODO
     );
   }
 
@@ -64,15 +72,13 @@ class UserNotifier extends StateNotifier<UserState> {
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
         _auth = auth ?? FirebaseAuth.instance,
         super(UserState.initial()) {
-    // Firebase Auth 상태 변화를 감지
     _authSubscription = _auth.authStateChanges().listen((user) {
-      if (mounted) {
-        if (user != null) {
-          _loadUser();
-        } else {
-          // 로그아웃 시 상태 초기화
-          state = UserState.initial();
-        }
+      if (!mounted) return;
+
+      if (user != null) {
+        _loadUser();
+      } else {
+        state = UserState.initial();
       }
     });
   }
@@ -80,11 +86,32 @@ class UserNotifier extends StateNotifier<UserState> {
   CollectionReference<Map<String, dynamic>> get _users =>
       _firestore.collection('users');
 
+  Future<void> _ensureUserDoc(String uid, {String? email}) async {
+    final ref = _users.doc(uid);
+    final doc = await ref.get();
+
+    if (!doc.exists) {
+      await ref.set({
+        'nickname': email ?? 'Dreamer',
+        'coins': kDefaultCoins,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } else {
+      final data = doc.data();
+      if (data != null && !data.containsKey('coins')) {
+        await ref.set({'coins': kDefaultCoins}, SetOptions(merge: true));
+      }
+    }
+  }
+
   Future<void> _loadUser() async {
     if (!mounted) return;
-    
-    final uid = _auth.currentUser?.uid;
+
+    final user = _auth.currentUser;
+    final uid = user?.uid;
     if (uid == null) return;
+
+    await _ensureUserDoc(uid, email: user?.email);
 
     final doc = await _users.doc(uid).get();
     if (doc.exists && mounted) {
@@ -131,29 +158,25 @@ class UserNotifier extends StateNotifier<UserState> {
     state = state.copyWith(coins: newBalance, userId: uid);
   }
 
-  // Purchase an item
   bool purchaseItem(ShopItem item) {
     if (state.coins < item.price) return false;
-    
+
     final newPurchaseHistory = [...state.purchaseHistory, item];
     state = state.copyWith(
       coins: state.coins - item.price,
       purchaseHistory: newPurchaseHistory,
     );
-    
-    // Update Firestore
+
     _updateUserData();
     return true;
   }
 
-  // Record a sale
   void recordSale(ShopItem item) {
     final newSalesHistory = [...state.salesHistory, item];
     state = state.copyWith(salesHistory: newSalesHistory);
     _updateUserData();
   }
 
-  // Cancel a sale
   void cancelSale(String diaryId) {
     final newSalesHistory = state.salesHistory
         .where((item) => item.diaryId != diaryId)
@@ -162,7 +185,6 @@ class UserNotifier extends StateNotifier<UserState> {
     _updateUserData();
   }
 
-  // Update sale price
   void updateSalePrice(String diaryId, int newPrice) {
     final newSalesHistory = state.salesHistory.map((item) {
       if (item.diaryId == diaryId) {
@@ -185,7 +207,7 @@ class UserNotifier extends StateNotifier<UserState> {
       }
       return item;
     }).toList();
-    
+
     state = state.copyWith(salesHistory: newSalesHistory);
     _updateUserData();
   }
@@ -197,7 +219,6 @@ class UserNotifier extends StateNotifier<UserState> {
     await _users.doc(uid).set({
       'nickname': state.username,
       'coins': state.coins,
-      // Note: purchaseHistory and salesHistory could be stored in Firestore if needed
     }, SetOptions(merge: true));
   }
 
