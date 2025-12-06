@@ -31,7 +31,7 @@ class _DreamSketchScreenState extends ConsumerState<DreamSketchScreen> {
   Future<void> _analyzeAndCreate() async {
     if (_controller.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("그림을 먼저 그려주세요!")),
+        const SnackBar(content: Text('Please draw something first.')),
       );
       return;
     }
@@ -39,41 +39,38 @@ class _DreamSketchScreenState extends ConsumerState<DreamSketchScreen> {
     setState(() => _isAnalyzing = true);
 
     try {
-      // 1. 이미지를 PNG 바이트로 변환
       final Uint8List? imageBytes = await _controller.toPngBytes();
 
       if (imageBytes == null) {
-        throw Exception("이미지 변환 실패");
+        throw Exception('Failed to export sketch image.');
       }
 
-      // 2. Gemini 서비스 호출
       final geminiService = ref.read(geminiServiceProvider);
       final interpretation = await geminiService.analyzeDreamSketch(imageBytes);
 
       if (!mounted) return;
 
-      if (interpretation == null || interpretation.startsWith("오류")) {
+      if (interpretation == null || interpretation.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("분석 실패: $interpretation")),
+          const SnackBar(content: Text('Could not analyze the sketch.')),
         );
         setState(() => _isAnalyzing = false);
         return;
       }
 
-      // 3. 결과와 함께 다이어리 작성 화면으로 이동
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => DiaryEditorScreen(
             selectedDate: DateTime.now(),
-            initialContent: interpretation, // 해석된 텍스트 전달
+            initialContent: interpretation,
           ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("오류가 발생했습니다: $e")),
+        SnackBar(content: Text('Unexpected error: $e')),
       );
       setState(() => _isAnalyzing = false);
     }
@@ -84,7 +81,7 @@ class _DreamSketchScreenState extends ConsumerState<DreamSketchScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFE6E6FA),
       appBar: AppBar(
-        title: const Text("꿈 그리기",
+        title: const Text('Dream Sketch',
             style: TextStyle(fontFamily: 'Stencil', color: Colors.white)),
         backgroundColor: const Color.fromARGB(255, 192, 171, 255),
         leading: const BackButton(color: Colors.white),
@@ -102,7 +99,7 @@ class _DreamSketchScreenState extends ConsumerState<DreamSketchScreen> {
                 children: [
                   CircularProgressIndicator(color: Color(0xFFAABCC5)),
                   SizedBox(height: 20),
-                  Text("꿈을 분석하고 있어요...",
+                  Text('Analyzing your sketch... hold on!',
                       style: TextStyle(
                           fontFamily: 'Stencil', color: Colors.black54)),
                 ],
@@ -141,10 +138,10 @@ class _DreamSketchScreenState extends ConsumerState<DreamSketchScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text("간단하게 그려보세요",
+                      const Text('Make a quick sketch',
                           style: TextStyle(color: Colors.grey)),
                       GgumButton(
-                        text: "완료",
+                        text: 'Analyze',
                         onPressed: _analyzeAndCreate,
                         width: 120,
                       ),
