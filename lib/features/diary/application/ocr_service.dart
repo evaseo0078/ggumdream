@@ -9,12 +9,12 @@ class OcrService {
       final inputImage = InputImage.fromFilePath(imagePath);
       final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
 
-      print('인식된 텍스트:');
+      print('recognized text:');
       print(recognizedText.text);
 
       return recognizedText.text;
     } catch (e) {
-      print('OCR 처리 중 오류: $e');
+      print('OCR processing error: $e');
       rethrow;
     }
   }

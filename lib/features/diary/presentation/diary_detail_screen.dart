@@ -124,8 +124,8 @@ class DiaryDetailScreen extends ConsumerWidget {
                     child: Hero(
                       tag: 'diaryImage_${e.id}',
                       child: Container(
-                        width: 140,
-                        height: 140,
+                        width: 180,
+                        height: 180,
                         decoration: BoxDecoration(
                           color: Colors.grey[300],
                           borderRadius: BorderRadius.circular(8),
@@ -140,16 +140,12 @@ class DiaryDetailScreen extends ConsumerWidget {
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Padding(
-                          padding: EdgeInsets.only(right:270.0), // 수치적으로 조정 가능
-                          child: Text(
-                            "Summary",
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
+                        const Text(
+                          "Summary",
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
-                        // padding 값을 변경하여 위치를 조정하세요.
-                        // 예: EdgeInsets.only(left: 32.0), EdgeInsets.symmetric(horizontal: 20.0) 등
                         const SizedBox(height: 7),
                         GlassCard(
                           radius: 8,
@@ -164,35 +160,6 @@ class DiaryDetailScreen extends ConsumerWidget {
                             child: Text(
                               e.summary ?? "No summary",
                               style: const TextStyle(fontSize: 15),
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 7),
-                        Padding(
-                          padding: EdgeInsets.only(right: 245.0), // 수치적으로 조정 가능
-                          child: Text(
-                            "Interpretation",
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                        ),
-                        const SizedBox(height: 7),
-                        GlassCard(
-                          radius: 8,
-                          opacity: 0.2,
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              e.interpretation ?? "No interpretation",
-                              style: const TextStyle(fontSize: 13),
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ),
@@ -200,6 +167,30 @@ class DiaryDetailScreen extends ConsumerWidget {
                     ),
                   ),
                 ],
+              ),
+              
+              const SizedBox(height: 20),
+              
+              const Text(
+                "Interpretation",
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const SizedBox(height: 7),
+              GlassCard(
+                radius: 8,
+                opacity: 0.2,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    e.interpretation ?? "No interpretation",
+                    style: const TextStyle(fontSize: 14, height: 1.5),
+                  ),
+                ),
               ),
               
               const SizedBox(height: 30),
