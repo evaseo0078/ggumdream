@@ -2,6 +2,7 @@
 
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -14,9 +15,6 @@ import '../application/diary_providers.dart';
 import '../application/user_provider.dart';
 import '../domain/diary_entry.dart';
 import 'diary_detail_screen.dart';
-import 'package:ggumdream/shared/widgets/wobbly_painter.dart'; // FIX: 패키지 경로로 변경
-import 'dart:ui';
-
 
 class DiaryEditorScreen extends ConsumerStatefulWidget {
   /// ✅ 선택한 날짜는 "기상일(=아침에 깬 날짜)" 개념으로 사용
@@ -34,24 +32,42 @@ class DiaryEditorScreen extends ConsumerStatefulWidget {
 }
 
 class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
-  late TextEditingController _textController; // late로 변경
-  double _sleepDuration = 7.0; 
-  bool _isSleepUnknown = false; 
+  late TextEditingController _textController;
+
+  bool _isSleepUnknown = false;
+
+  // ✅ 시간 입력 기반으로 전환
+  late TimeOfDay _sleepStart;
+  late TimeOfDay _sleepEnd;
+
+  // ✅ Stats / List와 기준 통일용 (logical day)
+  static const int _cutoffHour = 18;
 
   @override
   void initState() {
     super.initState();
-    // ⚡ [로직 추가] 기존 일기가 있으면 내용 채워넣기 (수정 모드)
-    if (widget.existingEntry != null) {
-      _textController = TextEditingController(text: widget.existingEntry!.content);
-      if (widget.existingEntry!.sleepDuration < 0) {
-        _isSleepUnknown = true;
-      } else {
-        _sleepDuration = widget.existingEntry!.sleepDuration;
-      }
+
+    final e = widget.existingEntry;
+
+    // 내용
+    _textController = TextEditingController(text: e?.content ?? "");
+
+    // 수면 unknown 여부
+    if (e != null && e.sleepDuration < 0) {
+      _isSleepUnknown = true;
+    }
+
+    // ✅ 기존 entry에 시간 정보가 있으면 그걸로
+    if (e?.sleepStartAt != null) {
+      _sleepStart = TimeOfDay.fromDateTime(e!.sleepStartAt!);
     } else {
-      _textController = TextEditingController();
-      _isSleepUnknown = false;
+      _sleepStart = const TimeOfDay(hour: 23, minute: 0);
+    }
+
+    if (e?.sleepEndAt != null) {
+      _sleepEnd = TimeOfDay.fromDateTime(e!.sleepEndAt!);
+    } else {
+      _sleepEnd = const TimeOfDay(hour: 7, minute: 0);
     }
   }
 
@@ -63,7 +79,12 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
 
   // ───────────────── 헬퍼들 ─────────────────
 
-  String _formatTime(TimeOfDay t) {
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  String _formatTod(TimeOfDay t) {
     final now = DateTime.now();
     final dt = DateTime(now.year, now.month, now.day, t.hour, t.minute);
     return DateFormat('HH:mm').format(dt);
@@ -79,13 +100,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     );
   }
 
-  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
-
-  bool _sameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
-
   /// ✅ 저장용 "일기 날짜"는 항상 날짜-only로 고정
-  ///    - 이렇게 해야 logicalDay 캘린더 붙는 기준이 흔들리지 않음
   DateTime _diaryDateForSave({required bool isEditMode}) {
     final raw = isEditMode
         ? (widget.existingEntry?.date ?? widget.selectedDate)
@@ -94,14 +109,12 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
   }
 
   /// ✅ 선택된 start/end로 "실제 interval" 만들기
-  /// - baseDate는 "기상일(=선택한 날짜)"로 간주
+  /// - baseDate는 기상일로 간주
   /// - end <= start면 start를 하루 전으로 간주 (자정 넘김)
   ({DateTime start, DateTime end}) _buildInterval(DateTime wakeDate) {
     DateTime start = _buildDateTime(wakeDate, _sleepStart);
     DateTime end = _buildDateTime(wakeDate, _sleepEnd);
 
-    // ✅ 23:00 ~ 07:00 같은 케이스면
-    //    start를 전날로 내려서 5일 23시 ~ 6일 07시 저장
     if (!end.isAfter(start)) {
       start = start.subtract(const Duration(days: 1));
     }
@@ -120,48 +133,43 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
 
     final itv = _buildInterval(wakeDate);
     final h = _durationFromInterval(itv.start, itv.end);
-    return "${h.toStringAsFixed(1)} Hours";
+    return "${h.toStringAsFixed(1)} Hours  (${_formatTod(_sleepStart)}-${_formatTod(_sleepEnd)})";
   }
 
   // ─────────────────
-  // ✅ 기존 기록 구간 텍스트용
+  // ✅ 기존 기록 같은 dream-day 묶기
   // ─────────────────
 
   List<DiaryEntry> _entriesOfSameDreamDay(
-      DateTime baseDate, List<DiaryEntry> all) {
-    // dream-day 기준은 모델 logicalDay() 사용
+    DateTime baseDate,
+    List<DiaryEntry> all,
+  ) {
     final dummy = DiaryEntry(
       id: "dummy",
       date: baseDate,
       content: "",
     );
-    final day = dummy.logicalDay();
+    final day = dummy.logicalDay(cutoffHour: _cutoffHour);
 
     return all.where((e) {
-      return _sameDay(e.logicalDay(), day);
+      return _sameDay(e.logicalDay(cutoffHour: _cutoffHour), day);
     }).toList();
   }
 
-  String _formatInterval(DateTime s, DateTime e) {
-    final f = DateFormat('HH:mm');
-    return "${f.format(s)}~${f.format(e)}";
-  }
-
-  // ─────────────────
-  // ✅ POST 시점 검증
-  // ─────────────────
-
   bool _intervalOverlap(
-      DateTime aStart, DateTime aEnd, DateTime bStart, DateTime bEnd) {
+    DateTime aStart,
+    DateTime aEnd,
+    DateTime bStart,
+    DateTime bEnd,
+  ) {
     return aStart.isBefore(bEnd) && bStart.isBefore(aEnd);
   }
 
-  /// ✅ 반환값이 null이면 통과, String이면 에러 메시지
+  /// ✅ POST 버튼에서만 적용되는 검증
   String? _validateSleepOnPost({
     required DiaryEntry candidate,
     required List<DiaryEntry> all,
   }) {
-    // unknown이면 검증 스킵
     if (candidate.sleepDuration < 0) return null;
 
     final baseDate = candidate.date;
@@ -217,8 +225,6 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     }
 
     final isEditMode = widget.existingEntry != null;
-
-    // ✅ 저장 기준 날짜 고정
     final diaryDate = _diaryDateForSave(isEditMode: isEditMode);
 
     DateTime? sAt;
@@ -226,7 +232,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     double sleepHours = -1.0;
 
     if (!_isSleepUnknown) {
-      final itv = _buildInterval(diaryDate); // ✅ diaryDate == 기상일
+      final itv = _buildInterval(diaryDate);
       sAt = itv.start;
       eAt = itv.end;
       sleepHours = _durationFromInterval(sAt, eAt);
@@ -247,7 +253,6 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
       interpretation: isEditMode ? widget.existingEntry!.interpretation : null,
     );
 
-    // ✅ Draft는 검증 없이 저장
     if (isEditMode) {
       ref.read(diaryListProvider.notifier).updateDiary(draftEntry);
     } else {
@@ -269,8 +274,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     if (text.length < minLength) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-              Text("Too short! Please write at least $minLength characters."),
+          content: Text("Too short! Please write at least $minLength chars."),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -278,23 +282,21 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     }
 
     final isEditMode = widget.existingEntry != null;
-
-    // ✅ 저장 기준 날짜 고정
     final diaryDate = _diaryDateForSave(isEditMode: isEditMode);
 
-    // ✅ POST 전 수면 값 계산
+    // ✅ 수면 시간 계산
     DateTime? sAt;
     DateTime? eAt;
     double sleepHours = -1.0;
 
     if (!_isSleepUnknown) {
-      final itv = _buildInterval(diaryDate); // ✅ 6일 23-07 → 5일23 ~ 6일07
+      final itv = _buildInterval(diaryDate);
       sAt = itv.start;
       eAt = itv.end;
       sleepHours = _durationFromInterval(sAt, eAt);
     }
 
-    // ✅ 1) LLM 전에 "수면 검증" 먼저 수행 (POST 버튼에서만!)
+    // ✅ POST 전 검증
     final tempEntryForValidation = DiaryEntry(
       id: isEditMode ? widget.existingEntry!.id : "temp",
       date: diaryDate,
@@ -313,6 +315,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     final allDiaries = ref.read(diaryListProvider);
     final err =
         _validateSleepOnPost(candidate: tempEntryForValidation, all: allDiaries);
+
     if (err != null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -321,7 +324,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
       return;
     }
 
-    // 👉 2) 검증 통과했을 때만 LLM 로딩
+    // ✅ LLM 로딩
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -331,7 +334,14 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
           children: [
             CircularProgressIndicator(color: Color(0xFFAABCC5)),
             SizedBox(height: 20),
-            Text("Re-Analyzing Dream...", style: TextStyle(color: Colors.white, fontSize: 16, decoration: TextDecoration.none)),
+            Text(
+              "Re-Analyzing Dream...",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                decoration: TextDecoration.none,
+              ),
+            ),
           ],
         ),
       ),
@@ -350,14 +360,17 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
 
       final newEntry = DiaryEntry(
         id: isEditMode ? widget.existingEntry!.id : const Uuid().v4(),
-        date: diaryDate, // ✅ 날짜-only 고정
+        date: diaryDate,
         content: text,
         imageUrl: imageUrl,
         summary: analysis['summary'],
         interpretation: analysis['interpretation'],
         mood: analysis['mood'] ?? "🌿",
-        sleepDuration: finalSleepDuration, 
-        isSold: isEditMode ? widget.existingEntry!.isSold : false, // 판매 상태 유지
+        sleepDuration: sleepHours,
+        sleepStartAt: sAt,
+        sleepEndAt: eAt,
+        isDraft: false,
+        isSold: isEditMode ? widget.existingEntry!.isSold : false,
       );
 
       if (isEditMode) {
@@ -371,7 +384,9 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
       Navigator.pop(context); // 로딩 닫기
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(isEditMode ? "Diary Updated!" : "Diary Posted! +10 coins")),
+        SnackBar(
+          content: Text(isEditMode ? "Diary Updated!" : "Diary Posted! +10 coins"),
+        ),
       );
 
       Navigator.pushReplacement(
@@ -391,21 +406,44 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
 
   // ───────────────── UI ─────────────────
 
+  Future<void> _pickStartTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _sleepStart,
+    );
+    if (picked != null) {
+      setState(() => _sleepStart = picked);
+    }
+  }
+
+  Future<void> _pickEndTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _sleepEnd,
+    );
+    if (picked != null) {
+      setState(() => _sleepEnd = picked);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // ✅ 표시용 날짜도 날짜-only로 안정화
-    final displayDate = _dateOnly(widget.existingEntry?.date ?? widget.selectedDate);
+    final displayDate =
+        _dateOnly(widget.existingEntry?.date ?? widget.selectedDate);
     final dateStr = DateFormat('yyyy/MM/dd (E)').format(displayDate);
 
     return Scaffold(
       appBar: AppBar(
-        leading: const BackButton(color: Color.fromARGB(255, 255, 255, 255)),
-        title: Text(dateStr,
-            style: const TextStyle(
-                color: Color.fromARGB(255, 255, 255, 255),
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Stencil')),
-                backgroundColor: const Color.fromARGB(255, 192, 171, 255),
+        leading: const BackButton(color: Colors.white),
+        title: Text(
+          dateStr,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Stencil',
+          ),
+        ),
+        backgroundColor: const Color.fromARGB(255, 192, 171, 255),
       ),
       body: Container(
         decoration: const BoxDecoration(
@@ -413,9 +451,9 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFE6E6FA), // Light purple
+              Color(0xFFE6E6FA),
               Color.fromARGB(255, 168, 152, 255),
-              Color.fromARGB(255, 152, 176, 255) // Dark purple
+              Color.fromARGB(255, 152, 176, 255),
             ],
           ),
         ),
@@ -424,175 +462,235 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("How long did you sleep?",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 129, 129, 129))),
+              const Text(
+                "How long did you sleep?",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color.fromARGB(255, 129, 129, 129),
+                ),
+              ),
               const SizedBox(height: 10),
 
-              // 수면 시간 입력 박스 (WobblyContainer 적용)
+              // ✅ 수면 입력 카드
               ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14), // 🔥 blur 강하게 적용
-        child: WobblyContainer(
-          backgroundColor: Colors.white.withOpacity(0.15), // 🔥 Glass 배경
-          borderColor: Colors.white.withOpacity(0.45),      // 🔥 Glass 테두리
-          borderRadius: 20,
-          padding: EdgeInsets.zero,
+                borderRadius: BorderRadius.circular(20),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                  child: WobblyContainer(
+                    backgroundColor: Colors.white.withOpacity(0.15),
+                    borderColor: Colors.white.withOpacity(0.45),
+                    borderRadius: 20,
+                    padding: EdgeInsets.zero,
+                    child: Column(
+                      children: [
+                        // 탭 버튼
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () =>
+                                    setState(() => _isSleepUnknown = false),
+                                child: Container(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: !_isSleepUnknown
+                                        ? const Color.fromARGB(
+                                                255, 190, 150, 255)
+                                            .withOpacity(0.2)
+                                        : Colors.transparent,
+                                    borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(20),
+                                    ),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    "Input Time",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: !_isSleepUnknown
+                                          ? Colors.white
+                                          : Colors.white70,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(
+                              width: 1,
+                              height: 40,
+                              child: VerticalDivider(color: Colors.white54),
+                            ),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () =>
+                                    setState(() => _isSleepUnknown = true),
+                                child: Container(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: _isSleepUnknown
+                                        ? const Color.fromARGB(
+                                                255, 190, 150, 255)
+                                            .withOpacity(0.35)
+                                        : Colors.transparent,
+                                    borderRadius: const BorderRadius.only(
+                                      topRight: Radius.circular(20),
+                                    ),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    "Don't Know",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: _isSleepUnknown
+                                          ? Colors.white
+                                          : Colors.white70,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
 
-          child: Column(
-            children: [
-              // --- 탭 버튼 영역 ---
-              Row(
-                children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: () => setState(() => _isSleepUnknown = false),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: !_isSleepUnknown
-                              ? const Color.fromARGB(255, 190, 150, 255).withOpacity(0.2) // 선택된 탭 더 밝게
-                              : const Color.fromARGB(0, 176, 149, 255),
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(20),
-                          ),
+                        const Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: Colors.white30,
                         ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          "Input Time",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: !_isSleepUnknown ? Colors.white : Colors.white70,
-                          ),
+
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: _isSleepUnknown
+                              ? const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 10),
+                                  child: Text(
+                                    "Sleep duration will not be recorded.",
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                )
+                              : Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // ✅ 라벨
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const Icon(Icons.bedtime,
+                                            color: Colors.white),
+                                        Text(
+                                          _sleepLabel(displayDate),
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    // ✅ Start/End 선택 버튼
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: OutlinedButton(
+                                            style: OutlinedButton.styleFrom(
+                                              side: BorderSide(
+                                                color: Colors.white
+                                                    .withOpacity(0.6),
+                                              ),
+                                            ),
+                                            onPressed: _pickStartTime,
+                                            child: Text(
+                                              "Start  ${_formatTod(_sleepStart)}",
+                                              style: const TextStyle(
+                                                  color: Colors.white),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: OutlinedButton(
+                                            style: OutlinedButton.styleFrom(
+                                              side: BorderSide(
+                                                color: Colors.white
+                                                    .withOpacity(0.6),
+                                              ),
+                                            ),
+                                            onPressed: _pickEndTime,
+                                            child: Text(
+                                              "End  ${_formatTod(_sleepEnd)}",
+                                              style: const TextStyle(
+                                                  color: Colors.white),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
-
-                  const SizedBox(
-                    width: 1,
-                    height: 40,
-                    child: VerticalDivider(color: Colors.white54),
-                  ),
-
-                  Expanded(
-                    child: InkWell(
-                      onTap: () => setState(() => _isSleepUnknown = true),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: _isSleepUnknown
-                              ? Color.fromARGB(255, 190, 150, 255).withOpacity(0.35)
-                              : Colors.transparent,
-                          borderRadius: const BorderRadius.only(
-                            topRight: Radius.circular(20),
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          "Don't Know",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: _isSleepUnknown ? Colors.white : Colors.white70,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
 
-              const Divider(height: 1, thickness: 1, color: Colors.white30),
+              const SizedBox(height: 30),
 
-              // --- 입력 값 및 슬라이더 표시 ---
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: _isSleepUnknown
-                    ? const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 10),
-                        child: Text(
-                          "Sleep duration will not be recorded.",
-                          style: TextStyle(
+              const Text(
+                "Write your dream (min 20 chars)",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // ✅ 내용 입력 카드
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                    child: WobblyContainer(
+                      backgroundColor: Colors.white.withOpacity(0.3),
+                      borderColor: Colors.white.withOpacity(0.5),
+                      borderRadius: 20,
+                      padding: const EdgeInsets.all(16),
+                      child: TextField(
+                        controller: _textController,
+                        maxLines: null,
+                        expands: true,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          height: 1.5,
+                          color: Color.fromARGB(255, 46, 46, 46),
+                        ),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          hintText: "Describe what happened in your dream...",
+                          hintStyle: TextStyle(
                             color: Colors.white70,
                             fontStyle: FontStyle.italic,
                           ),
                         ),
-                      )
-                    : Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Icon(Icons.bedtime, color: Colors.white),
-                              Text(
-                                "${_sleepDuration.toStringAsFixed(1)} Hours",
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Slider(
-                            value: _sleepDuration,
-                            min: 0,
-                            max: 16,
-                            divisions: 32,
-                            activeColor: Colors.white,
-                            inactiveColor: Colors.white30,
-                            onChanged: (value) =>
-                                setState(() => _sleepDuration = value),
-                          ),
-                        ],
                       ),
+                    ),
+                  ),
+                ),
               ),
-            ],
-          ),
-        ),
-      ),
-    ),
-
-
-              const SizedBox(height: 30),
-
-              const Text("Write your dream (min 20 chars)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 255, 255, 255) )),
-              const SizedBox(height: 10),
-              Expanded(
-  child: ClipRRect(
-    borderRadius: BorderRadius.circular(20),
-    child: BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12), // 🔥 blur
-      child: WobblyContainer(
-        backgroundColor: Colors.white.withOpacity(0.3), // 🔥 Glass 투명 배경
-        borderColor: Colors.white.withOpacity(0.5),      // 🔥 은은한 흰 테두리
-        borderRadius: 20,
-        padding: const EdgeInsets.all(16),
-
-        child: TextField(
-          controller: _textController,
-          maxLines: null,
-          expands: true,
-          style: const TextStyle(
-            fontSize: 16,
-            height: 1.5,
-            color: Color.fromARGB(255, 46, 46, 46), // 🔥 유리 스타일에서는 흰 글씨가 예쁨
-          ),
-          decoration: const InputDecoration(
-            border: InputBorder.none,
-            hintText: "Describe what happened in your dream...",
-            hintStyle: TextStyle(
-              color: Colors.white70,
-              fontStyle: FontStyle.italic,   // 🔥 hint도 어울리게 변경
-            ),
-          ),
-        ),
-      ),
-    ),
-  ),
-),
 
               const SizedBox(height: 20),
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
