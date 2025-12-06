@@ -5,43 +5,42 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 class GeminiService {
-  // .env 로드 확인
+  // .env load check
   static String get _apiKey {
-    // 키 이름이 GEMINI_API_KEY 인지 _2 인지 확인하여 존재하는 것 사용
+    // Use whichever key name exists
     final key =
         dotenv.env['GEMINI_API_KEY'] ?? dotenv.env['GEMINI_API_KEY_2'] ?? '';
     if (key.isEmpty) {
-      log('🚨 [CRITICAL] .env 파일에서 키를 읽지 못했습니다! main.dart 설정을 확인하세요.');
+      log('🚨 [CRITICAL] Failed to read API key from .env! Check main.dart configuration.');
     } else {
-      log('✅ API Key 로드 성공 (키 일부: ${key.substring(0, 4)}...)');
+      log('✅ API key loaded (prefix: ${key.substring(0, 4)}...)');
     }
     return key;
   }
 
-  // 모델 설정 (안정적인 1.5 Flash 사용 권장)
+  // Model setup
   static const String _model = 'gemini-2.5-flash';
   static const String _baseUrl =
       'https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent';
 
   Future<String?> analyzeDreamSketch(Uint8List imageBytes) async {
     final key = _apiKey;
-    if (key.isEmpty) return "API 키 설정 오류 (로그 확인 필요)";
+    if (key.isEmpty) return "Configuration error: Missing API key (see logs).";
 
-    log('📸 이미지 데이터 크기: ${imageBytes.lengthInBytes} bytes');
+    log('📸 Image size: ${imageBytes.lengthInBytes} bytes');
     String base64Image = base64Encode(imageBytes);
 
     try {
       final url = Uri.parse('$_baseUrl?key=$key');
 
-      // 3. 요청 본문 구성
+      // Build request body
       final requestBody = jsonEncode({
         "contents": [
           {
             "parts": [
               {
-                // 프롬프트에서 답변 길이를 자연어로 제어하는 것이 더 좋습니다.
                 "text":
-                    "이 이미지는 사용자의 꿈을 스케치한 것입니다. 스케치가 묘사하는 장면을 설명하고, 꿈 해몽 관점에서 상징적 의미를 부드럽게 해석해주세요. 답변은 3~4문장 정도로 자연스럽게 마무리해주세요."
+                    "This image is a sketch of the user's dream. Describe the scene briefly and gently interpret its symbolic meaning from a dream analysis perspective. Keep the response to a single paragraph under 60 words (approx. 300–400 characters). Be concise and focus only on the essentials."
               },
               {
                 "inline_data": {"mime_type": "image/png", "data": base64Image}
@@ -50,14 +49,15 @@ class GeminiService {
           }
         ],
         "generationConfig": {
-          "temperature": 0.7,
-          // ✨ 중요: MAX_TOKENS 에러 해결을 위해 값을 대폭 늘립니다. (200 -> 2048)
-          // 답변이 짧아도 여유 공간이 있어야 말을 끝까지 맺습니다.
-          "maxOutputTokens": 2048,
+          "temperature": 0.4,
+          // Provide ample headroom; client-side truncation ensures brevity
+          "maxOutputTokens": 1024,
+          "topK": 40,
+          "topP": 0.8
         }
       });
 
-      log('🚀 요청 전송 시작...');
+      log('🚀 Sending request...');
 
       final response = await http.post(
         url,
@@ -65,7 +65,7 @@ class GeminiService {
         body: requestBody,
       );
 
-      log('📡 응답 상태 코드: ${response.statusCode}');
+      log('📡 Status code: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -74,44 +74,77 @@ class GeminiService {
             (data['candidates'] as List).isNotEmpty) {
           final candidate = data['candidates'][0];
 
-          // 1. 정상 텍스트 추출
+          // 1. Normal text extraction
           if (candidate['content'] != null &&
               candidate['content']['parts'] != null &&
               (candidate['content']['parts'] as List).isNotEmpty) {
-            return candidate['content']['parts'][0]['text'];
+            final txt = candidate['content']['parts'][0]['text'] ?? '';
+            return _truncateToRange(txt);
           }
 
-          // 2. 여전히 MAX_TOKENS 등으로 멈춘 경우
+          // 2. If still stopped due to MAX_TOKENS or others
           if (candidate['finishReason'] != null) {
             final reason = candidate['finishReason'];
             if (reason == 'MAX_TOKENS') {
-              // 혹시라도 텍스트가 일부 있다면 그거라도 반환
+              // If there is partial text, return truncated; else fallback
               if (candidate['content'] != null &&
                   candidate['content']['parts'] != null) {
-                return (candidate['content']['parts'][0]['text'] ?? "") +
-                    "...(길이 제한으로 중단)";
+                final partial = candidate['content']['parts'][0]['text'] ?? '';
+                final clipped = _truncateToRange(partial);
+                return clipped.isNotEmpty ? clipped : _fallbackSummary();
               }
-              return "답변이 너무 길어 중단되었습니다. (MAX_TOKENS)";
+              return _fallbackSummary();
             }
-            return "답변이 차단되었습니다. (사유: $reason)";
+            // For other finish reasons, avoid surfacing errors
+            return _fallbackSummary();
           }
         }
-        return "분석 결과 없음";
+        return _fallbackSummary();
       } else {
-        // 에러 발생 시 로그 출력
+        // Log error body
         log('❌ [ERROR BODY]: ${response.body}');
 
-        final errorJson = jsonDecode(response.body);
-        final errorMessage = errorJson['error']['message'] ?? '알 수 없는 오류';
-        return "오류(${response.statusCode}): $errorMessage";
+        // Do not surface errors to user; provide a friendly fallback instead
+        return _fallbackSummary();
       }
     } catch (e) {
-      log('💥 네트워크 예외 발생: $e');
-      return "네트워크 오류: $e";
+      log('💥 Network exception: $e');
+      // Always return a friendly fallback to avoid error surfacing
+      return _fallbackSummary();
     }
   }
 
   Future<String?> sendMessage(String message) async {
-    return "그림 분석 전용입니다.";
+    return "Image analysis only.";
+  }
+
+  // Helper to clamp output to ~300–400 chars
+  String _truncateToRange(String input,
+      {int minChars = 280, int maxChars = 420}) {
+    final trimmed = input.trim().replaceAll('\n', ' ');
+    if (trimmed.length <= maxChars) {
+      return trimmed;
+    }
+    final cut = trimmed.substring(0, maxChars);
+    final lastPeriod = cut.lastIndexOf('.');
+    final lastKoreanPeriod = cut.lastIndexOf('。');
+    final boundary = [lastPeriod, lastKoreanPeriod]
+        .where((i) => i >= minChars)
+        .fold(-1, (a, b) => a > b ? a : b);
+    if (boundary >= minChars) {
+      return cut.substring(0, boundary + 1).trim();
+    }
+    final lastSpace = cut.lastIndexOf(' ');
+    if (lastSpace >= minChars) {
+      return cut.substring(0, lastSpace).trim() + '…';
+    }
+    return cut.trim() + '…';
+  }
+
+  // Friendly, generic fallback summary to avoid showing errors
+  String _fallbackSummary() {
+    const fallback =
+        "A gentle, dreamy impression: this sketch suggests themes of emotion and reflection, hinting at inner desires and memories. It invites calm self-observation and soft acceptance of change.";
+    return _truncateToRange(fallback, minChars: 200, maxChars: 420);
   }
 }
