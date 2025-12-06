@@ -49,6 +49,30 @@ class DiaryDetailScreen extends ConsumerWidget {
     this.entryId,
   }) : assert(entry != null || entryId != null);
 
+  // ------------------------------------------------------------
+  // ✅ Sleep label helper
+  // ------------------------------------------------------------
+  String _formatHm(DateTime dt) => DateFormat('HH:mm').format(dt);
+
+  String _sleepHeaderText(DiaryEntry e) {
+    // unknown
+    if (e.sleepDuration < 0) {
+      return "Sleep: unknown";
+    }
+
+    final hasInterval = e.sleepStartAt != null && e.sleepEndAt != null;
+
+    // duration만 있는 경우
+    if (!hasInterval) {
+      return "Sleep: ${e.sleepDuration.toStringAsFixed(1)} h";
+    }
+
+    final s = e.sleepStartAt!;
+    final ed = e.sleepEndAt!;
+
+    return "Sleep: ${e.sleepDuration.toStringAsFixed(1)} h (${_formatHm(s)}-${_formatHm(ed)})";
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final diaryList = ref.watch(diaryListProvider);
@@ -57,8 +81,7 @@ class DiaryDetailScreen extends ConsumerWidget {
     DiaryEntry? resolvedEntry = entry;
     if (resolvedEntry == null && entryId != null) {
       try {
-        resolvedEntry =
-            diaryList.firstWhere((e) => e.id == entryId);
+        resolvedEntry = diaryList.firstWhere((e) => e.id == entryId);
       } catch (_) {
         resolvedEntry = null;
       }
@@ -69,8 +92,10 @@ class DiaryDetailScreen extends ConsumerWidget {
         appBar: AppBar(
           title: const Text(
             'Diary',
-            style:
-                TextStyle(fontFamily: 'Stencil', fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontFamily: 'Stencil',
+              fontWeight: FontWeight.bold,
+            ),
           ),
           centerTitle: true,
           backgroundColor: const Color(0xFFC0ABFF),
@@ -81,8 +106,8 @@ class DiaryDetailScreen extends ConsumerWidget {
       );
     }
 
-    final dateStr =
-        DateFormat('yyyy.MM.dd (E)').format(resolvedEntry.date);
+    final e = resolvedEntry;
+    final dateStr = DateFormat('yyyy.MM.dd (E)').format(e.date);
 
     return Scaffold(
       appBar: AppBar(
@@ -104,8 +129,8 @@ class DiaryDetailScreen extends ConsumerWidget {
                 context,
                 MaterialPageRoute(
                   builder: (_) => DiaryEditorScreen(
-                    selectedDate: resolvedEntry!.date,
-                    existingEntry: resolvedEntry,
+                    selectedDate: e.date,
+                    existingEntry: e,
                   ),
                 ),
               );
@@ -113,7 +138,7 @@ class DiaryDetailScreen extends ConsumerWidget {
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline, color: Colors.white),
-            onPressed: () => _confirmDelete(context, ref, resolvedEntry!.id),
+            onPressed: () => _confirmDelete(context, ref, e.id),
           ),
         ],
       ),
@@ -140,11 +165,13 @@ class DiaryDetailScreen extends ConsumerWidget {
                   radius: 22,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     child: Row(
                       children: [
                         Text(
-                          resolvedEntry.mood,
+                          e.mood,
                           style: const TextStyle(fontSize: 28),
                         ),
                         const SizedBox(width: 12),
@@ -161,10 +188,10 @@ class DiaryDetailScreen extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(height: 4),
+
+                              // ✅ 변경된 Sleep 표기
                               Text(
-                                resolvedEntry.sleepDuration >= 0
-                                    ? "Sleep: ${resolvedEntry.sleepDuration.toStringAsFixed(1)} h"
-                                    : "Sleep: unknown",
+                                _sleepHeaderText(e),
                                 style: const TextStyle(
                                   fontSize: 13,
                                   color: Colors.black54,
@@ -181,7 +208,7 @@ class DiaryDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 20),
 
                 // 이미지 카드
-                if (resolvedEntry.imageUrl != null)
+                if (e.imageUrl != null)
                   glassCard(
                     radius: 22,
                     child: GestureDetector(
@@ -190,20 +217,20 @@ class DiaryDetailScreen extends ConsumerWidget {
                           context,
                           MaterialPageRoute(
                             builder: (_) => FullScreenImageViewer(
-                              imageUrl: resolvedEntry!.imageUrl!,
-                              tag: 'diary-image-${resolvedEntry.id}',
+                              imageUrl: e.imageUrl!,
+                              tag: 'diary-image-${e.id}',
                             ),
                           ),
                         );
                       },
                       child: Hero(
-                        tag: 'diary-image-${resolvedEntry.id}',
+                        tag: 'diary-image-${e.id}',
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(22),
                           child: AspectRatio(
                             aspectRatio: 4 / 3,
                             child: Image.network(
-                              resolvedEntry.imageUrl!,
+                              e.imageUrl!,
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => Container(
                                 color: Colors.grey[300],
@@ -221,12 +248,10 @@ class DiaryDetailScreen extends ConsumerWidget {
                     ),
                   ),
 
-                if (resolvedEntry.imageUrl != null)
-                  const SizedBox(height: 20),
+                if (e.imageUrl != null) const SizedBox(height: 20),
 
                 // 요약 / 해석 카드
-                if (resolvedEntry.summary != null ||
-                    resolvedEntry.interpretation != null)
+                if (e.summary != null || e.interpretation != null)
                   glassCard(
                     radius: 22,
                     child: Padding(
@@ -234,7 +259,7 @@ class DiaryDetailScreen extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (resolvedEntry.summary != null) ...[
+                          if (e.summary != null) ...[
                             const Text(
                               "Summary",
                               style: TextStyle(
@@ -244,7 +269,7 @@ class DiaryDetailScreen extends ConsumerWidget {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              resolvedEntry.summary!,
+                              e.summary!,
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: Colors.black87,
@@ -252,7 +277,7 @@ class DiaryDetailScreen extends ConsumerWidget {
                             ),
                             const SizedBox(height: 14),
                           ],
-                          if (resolvedEntry.interpretation != null) ...[
+                          if (e.interpretation != null) ...[
                             const Text(
                               "Interpretation",
                               style: TextStyle(
@@ -262,7 +287,7 @@ class DiaryDetailScreen extends ConsumerWidget {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              resolvedEntry.interpretation!,
+                              e.interpretation!,
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: Colors.black87,
@@ -274,8 +299,7 @@ class DiaryDetailScreen extends ConsumerWidget {
                     ),
                   ),
 
-                if (resolvedEntry.summary != null ||
-                    resolvedEntry.interpretation != null)
+                if (e.summary != null || e.interpretation != null)
                   const SizedBox(height: 20),
 
                 // 원문 내용 카드
@@ -295,7 +319,7 @@ class DiaryDetailScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          resolvedEntry.content,
+                          e.content,
                           style: const TextStyle(
                             fontSize: 14,
                             height: 1.5,
@@ -316,14 +340,12 @@ class DiaryDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _confirmDelete(
-      BuildContext context, WidgetRef ref, String entryId) {
+  void _confirmDelete(BuildContext context, WidgetRef ref, String entryId) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text("Delete Diary"),
-        content:
-            const Text("Are you sure you want to delete this diary entry?"),
+        content: const Text("Are you sure you want to delete this diary entry?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),

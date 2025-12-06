@@ -47,8 +47,11 @@ class DiaryEntry {
   // ------------------------------------------------------------
   double get sleepDurationInHours => sleepDuration;
 
+  bool get hasSleepInterval => sleepStartAt != null && sleepEndAt != null;
+
   // ------------------------------------------------------------
   // ✅ Dream day 계산 (cutoff 18:00)
+  // - "꿈 기록이 붙는 날짜" 기준
   // ------------------------------------------------------------
   DateTime logicalDay({int cutoffHour = 18}) {
     final d = date;
@@ -65,6 +68,29 @@ class DiaryEntry {
       return base.subtract(const Duration(days: 1));
     }
     return base;
+  }
+
+  // ------------------------------------------------------------
+  // ✅ Sleep logical day 계산
+  // - "수면 기록이 캘린더/스탯에서 붙는 날짜" 기준
+  //
+  // ✅ 너의 요구사항:
+  //   6일 23-07 입력 → 실제 interval이
+  //   5일 23:00 ~ 6일 07:00 으로 저장되더라도
+  //   "6일 logical day에 붙게"
+  //
+  // => 즉, sleepEndAt(기상 시각)의 날짜를 기준으로 붙이는 방식
+  // ------------------------------------------------------------
+  DateTime sleepLogicalDay({int cutoffHour = 18}) {
+    // 기상 시간이 있으면 그 날짜에 붙인다
+    if (sleepEndAt != null) {
+      final e = sleepEndAt!;
+      return DateTime(e.year, e.month, e.day);
+    }
+
+    // fallback: date 기준
+    final d = date;
+    return DateTime(d.year, d.month, d.day);
   }
 
   // ------------------------------------------------------------
@@ -112,8 +138,10 @@ class DiaryEntry {
       'interpretation': interpretation,
       'mood': mood,
       'sleepDuration': sleepDuration,
-      'sleepStartAt': sleepStartAt == null ? null : Timestamp.fromDate(sleepStartAt!),
-      'sleepEndAt': sleepEndAt == null ? null : Timestamp.fromDate(sleepEndAt!),
+      'sleepStartAt':
+          sleepStartAt == null ? null : Timestamp.fromDate(sleepStartAt!),
+      'sleepEndAt':
+          sleepEndAt == null ? null : Timestamp.fromDate(sleepEndAt!),
       'isSold': isSold,
       'isDraft': isDraft,
       'updatedAt': FieldValue.serverTimestamp(),

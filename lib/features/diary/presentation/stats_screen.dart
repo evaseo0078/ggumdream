@@ -20,6 +20,13 @@ class StatsScreen extends ConsumerStatefulWidget {
 class _StatsScreenState extends ConsumerState<StatsScreen> {
   NightmareRange _range = NightmareRange.d30;
 
+  // ✅ dream-day cutoff (Nightmare/Diary 쪽에만 의미)
+  static const int _cutoffHour = 18;
+
+  // ✅ 24H axis
+  static const double _minY = 0;
+  static const double _maxY = 24;
+
   @override
   Widget build(BuildContext context) {
     final diaryList = ref.watch(diaryListProvider);
@@ -45,7 +52,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     }
 
     // ---------------------------
-    // 1) Nightmare Ratio - 기간 필터 적용
+    // 1) Nightmare Ratio - 기간 필터
     // ---------------------------
     final now = DateTime.now();
     final DateTime? start = _startForRange(now, _range);
@@ -68,41 +75,30 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     final int totalDreams = nightmareCount + normalCount;
 
     // ---------------------------
-    // 2) Sleep Trend - "하루 총 수면" 최근 7일
+    // 2) Sleep Period Chart
+    // ✅ 여기서는 "수면"을 더 직관적으로:
+    //    - 최근 7일 "캘린더 날짜" 기준
+    //    - 구간이 있으면 "기상일(sleepEndAt)" 기준으로 날짜에 붙임
     // ---------------------------
-    final last7Days = _lastNDays(now, 7); // 날짜 리스트 (오래된 → 최신)
+    final todayKey = _dateOnly(now);
+    final last7Days = _lastNDays(todayKey, 7); // 오래된 → 최신
 
-    // 날짜별 총 수면 합산
-    // sleepDuration < 0 은 "모름" 취급이라 제외
-    final Map<DateTime, double> sleepTotalByDay = {};
+    final intervalsByDay = _sleepIntervalsByWakeDay(
+      diaryList,
+      last7Days,
+    );
 
-    for (final d in last7Days) {
-      sleepTotalByDay[_dateOnly(d)] = 0.0;
-    }
+    final dailyDurations = last7Days.map((d) {
+      final key = _dateOnly(d);
+      return _sumSleepDurationForWakeDay(diaryList, key);
+    }).toList();
 
-    for (final entry in diaryList) {
-      if (entry.sleepDuration < 0) continue;
-
-      final key = _dateOnly(entry.date);
-      if (sleepTotalByDay.containsKey(key)) {
-        sleepTotalByDay[key] = (sleepTotalByDay[key] ?? 0) + entry.sleepDuration;
-      }
-    }
-
-    // 그래프용 데이터
-    final dailyTotals = last7Days
-        .map((d) => sleepTotalByDay[_dateOnly(d)] ?? 0.0)
-        .toList();
-
-    // 7일 평균 (✅ 0.0 제외)
     double avgSleep7 = 0;
-    final nonZeroTotals = dailyTotals.where((v) => v > 0).toList();
-
+    final nonZeroTotals = dailyDurations.where((v) => v > 0).toList();
     if (nonZeroTotals.isNotEmpty) {
       final sum = nonZeroTotals.fold<double>(0, (a, b) => a + b);
       avgSleep7 = sum / nonZeroTotals.length;
     }
-
 
     return Scaffold(
       appBar: AppBar(
@@ -153,29 +149,21 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-
                             const SizedBox(height: 10),
-
-                            // ✅ 필터 탭
                             _rangeTabs(),
-
                             const SizedBox(height: 12),
-
                             Text(_rangeLabel(_range)),
                             const SizedBox(height: 6),
                             Text("Nightmares: $nightmareCount"),
                             Text("Normal dreams: $normalCount"),
                             const SizedBox(height: 8),
-
                             Text(
                               totalDreams == 0
                                   ? "Nightmares: 0.0%"
                                   : "Nightmares: ${(nightmareCount / totalDreams * 100).toStringAsFixed(1)}%",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
                             ),
-
                             const SizedBox(height: 6),
                             Text(
                               "Records counted: $totalDreams",
@@ -184,11 +172,11 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                                 color: Colors.black54,
                               ),
                             ),
-
                             const SizedBox(height: 12),
                             Row(
                               children: [
-                                _legendDot(Colors.redAccent),
+                                _legendDot(
+                                    const Color.fromARGB(255, 94, 82, 82)),
                                 const SizedBox(width: 6),
                                 const Text("Nightmare (😢, 😡, 😱)"),
                               ],
@@ -214,8 +202,11 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                             sections: [
                               PieChartSectionData(
                                 value: nightmareCount.toDouble(),
-                                color: Colors.redAccent,
-                                title: nightmareCount == 0 ? '' : '$nightmareCount',
+                                color:
+                                    const Color.fromARGB(255, 94, 82, 82),
+                                title: nightmareCount == 0
+                                    ? ''
+                                    : '$nightmareCount',
                                 radius: 50,
                                 titleStyle: const TextStyle(
                                   fontSize: 16,
@@ -226,7 +217,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                               PieChartSectionData(
                                 value: normalCount.toDouble(),
                                 color: const Color(0xFFAABCC5),
-                                title: normalCount == 0 ? '' : '$normalCount',
+                                title:
+                                    normalCount == 0 ? '' : '$normalCount',
                                 radius: 50,
                                 titleStyle: const TextStyle(
                                   fontSize: 16,
@@ -246,7 +238,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               const SizedBox(height: 20),
 
               // ============================
-              // 카드 2: Sleep Duration Trend
+              // 카드 2: Sleep Period (24H)
               // ============================
               _glassCard(
                 child: Padding(
@@ -255,7 +247,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        "Sleep Duration Trend",
+                        "Sleep Period (24H)",
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -263,84 +255,15 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                       ),
                       const SizedBox(height: 4),
                       const Text(
-                        "Last 7 days (daily total)",
+                        "Last 7 days (range view)",
                         style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                       const SizedBox(height: 16),
                       SizedBox(
-                        height: 200,
-                        child: LineChart(
-                          LineChartData(
-                            minY: 0,
-                            maxY: 15,
-                            gridData: FlGridData(
-                              show: true,
-                              getDrawingHorizontalLine: (value) =>
-                                  FlLine(color: Colors.white24, strokeWidth: 1),
-                              getDrawingVerticalLine: (value) =>
-                                  FlLine(color: Colors.white24, strokeWidth: 1),
-                            ),
-                            titlesData: FlTitlesData(
-                              leftTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  showTitles: true,
-                                  reservedSize: 30,
-                                  getTitlesWidget: (value, meta) {
-                                    return Text(
-                                      value.toInt().toString(),
-                                      style: const TextStyle(fontSize: 10),
-                                    );
-                                  },
-                                ),
-                              ),
-                              bottomTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  showTitles: true,
-                                  getTitlesWidget: (value, meta) {
-                                    final index = value.toInt();
-                                    if (index < 0 || index >= last7Days.length) {
-                                      return const SizedBox.shrink();
-                                    }
-                                    final d = last7Days[index];
-                                    return Text(
-                                      "${d.month}/${d.day}",
-                                      style: const TextStyle(fontSize: 10),
-                                    );
-                                  },
-                                ),
-                              ),
-                              topTitles: const AxisTitles(
-                                sideTitles: SideTitles(showTitles: false),
-                              ),
-                              rightTitles: const AxisTitles(
-                                sideTitles: SideTitles(showTitles: false),
-                              ),
-                            ),
-                            borderData: FlBorderData(
-                              show: true,
-                              border: Border.all(color: Colors.white24),
-                            ),
-                            lineBarsData: [
-                              LineChartBarData(
-                                spots: List.generate(
-                                  dailyTotals.length,
-                                  (index) => FlSpot(
-                                    index.toDouble(),
-                                    dailyTotals[index],
-                                  ),
-                                ),
-                                isCurved: false,
-                                color: const Color.fromARGB(255, 149, 117, 228),
-                                barWidth: 3,
-                                dotData: const FlDotData(show: true),
-                                belowBarData: BarAreaData(
-                                  show: true,
-                                  color: const Color.fromARGB(255, 192, 176, 233)
-                                      .withOpacity(0.2),
-                                ),
-                              ),
-                            ],
-                          ),
+                        height: 240,
+                        child: _buildSleepRangeChart(
+                          days: last7Days,
+                          intervalsByDay: intervalsByDay,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -360,6 +283,294 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         ),
       ),
     );
+  }
+
+  // -----------------------------------------------------
+  // ✅ Sleep range chart (multi-interval)
+  // - 24H 축
+  // - 자정 넘기는 구간은 2개로 분리
+  // - 세로 점선(세로 그리드) 제거
+  // -----------------------------------------------------
+  Widget _buildSleepRangeChart({
+    required List<DateTime> days,
+    required Map<DateTime, List<({double start, double end})>> intervalsByDay,
+  }) {
+    final groups = List.generate(days.length, (i) {
+      final key = _dateOnly(days[i]);
+      final intervals = intervalsByDay[key] ?? const [];
+
+      if (intervals.isEmpty) {
+        return BarChartGroupData(
+          x: i,
+          barRods: [
+            BarChartRodData(
+              toY: _maxY,
+              width: 10,
+              borderRadius: BorderRadius.circular(8),
+              rodStackItems: [
+                BarChartRodStackItem(_minY, _maxY, Colors.transparent),
+              ],
+            ),
+          ],
+        );
+      }
+
+      // ✅ 24h 축 표현을 위한 "구간 분해"
+      final segments = <({double start, double end})>[];
+
+      for (final itv in intervals) {
+        final s = itv.start;
+        final e = itv.end;
+
+        if (s == e) continue;
+
+        if (e > s) {
+          segments.add((
+            start: s.clamp(_minY, _maxY).toDouble(),
+            end: e.clamp(_minY, _maxY).toDouble(),
+          ));
+        } else {
+          // ✅ 자정 넘김: (s~24) + (0~e)
+          segments.add((
+            start: s.clamp(_minY, _maxY).toDouble(),
+            end: _maxY,
+          ));
+          segments.add((
+            start: _minY,
+            end: e.clamp(_minY, _maxY).toDouble(),
+          ));
+        }
+      }
+
+      segments.sort((a, b) => a.start.compareTo(b.start));
+
+      // rodStackItems 구성
+      final stacks = <BarChartRodStackItem>[];
+      double cursor = _minY;
+
+      for (final seg in segments) {
+        if (seg.end <= seg.start) continue;
+
+        if (seg.start > cursor) {
+          stacks.add(
+              BarChartRodStackItem(cursor, seg.start, Colors.transparent));
+        }
+
+        stacks.add(
+          BarChartRodStackItem(
+            seg.start,
+            seg.end,
+            const Color.fromARGB(255, 149, 117, 228),
+          ),
+        );
+
+        cursor = seg.end;
+      }
+
+      if (cursor < _maxY) {
+        stacks.add(BarChartRodStackItem(cursor, _maxY, Colors.transparent));
+      }
+
+      return BarChartGroupData(
+        x: i,
+        barRods: [
+          BarChartRodData(
+            toY: _maxY,
+            width: 10,
+            borderRadius: BorderRadius.circular(8),
+            rodStackItems: stacks,
+          ),
+        ],
+      );
+    });
+
+    return BarChart(
+      BarChartData(
+        minY: _minY,
+        maxY: _maxY,
+
+        // ✅ 세로 점선 제거
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          getDrawingHorizontalLine: (value) =>
+              FlLine(color: Colors.white24, strokeWidth: 1),
+        ),
+
+        borderData: FlBorderData(
+          show: true,
+          border: Border.all(color: Colors.white24),
+        ),
+
+        titlesData: FlTitlesData(
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 40,
+
+              // ✅ 3시간 단위 표시
+              getTitlesWidget: (value, meta) {
+                final v = value.round();
+
+                if (v % 3 != 0) return const SizedBox.shrink();
+                if (v < 0 || v > 24) return const SizedBox.shrink();
+
+                final label = v.toString().padLeft(2, '0');
+                return Text(label, style: const TextStyle(fontSize: 10));
+              },
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              getTitlesWidget: (value, meta) {
+                final idx = value.toInt();
+                if (idx < 0 || idx >= days.length) {
+                  return const SizedBox.shrink();
+                }
+                final d = days[idx];
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    "${d.month}/${d.day}",
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                );
+              },
+            ),
+          ),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+        ),
+
+        barGroups: groups,
+
+        barTouchData: BarTouchData(
+          enabled: true,
+          touchTooltipData: BarTouchTooltipData(
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+              final d = days[group.x.toInt()];
+              final key = _dateOnly(d);
+              final intervals = intervalsByDay[key] ?? const [];
+
+              if (intervals.isEmpty) {
+                return BarTooltipItem(
+                  "${d.month}/${d.day}\nNo sleep record",
+                  const TextStyle(color: Colors.white),
+                );
+              }
+
+              final lines = intervals.map((itv) {
+                final s = _formatHourLabel(itv.start);
+                final e = _formatHourLabel(itv.end);
+                return "$s ~ $e";
+              }).join("\n");
+
+              return BarTooltipItem(
+                "${d.month}/${d.day}\n$lines",
+                const TextStyle(color: Colors.white),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  // -----------------------------------------------------
+  // ✅ 수면 날짜 키 결정
+  // - 구간이 있으면 "기상일(sleepEndAt 날짜)" 기준으로 붙임
+  // - 없으면 기존 dream-day 기준 fallback
+  // -----------------------------------------------------
+  DateTime _sleepDayKey(DiaryEntry e) {
+    final sAt = e.sleepStartAt;
+    final eAt = e.sleepEndAt;
+
+    if (sAt != null && eAt != null) {
+      return _dateOnly(eAt);
+    }
+
+    return _dateOnly(e.logicalDay(cutoffHour: _cutoffHour));
+  }
+
+  // -----------------------------------------------------
+  // ✅ 날짜별 수면 구간 리스트 집계
+  // - sleepStartAt/sleepEndAt 기반
+  // - "기상일 기준"으로 날짜에 붙임
+  // -----------------------------------------------------
+  Map<DateTime, List<({double start, double end})>> _sleepIntervalsByWakeDay(
+    List<DiaryEntry> entries,
+    List<DateTime> days,
+  ) {
+    final map = <DateTime, List<({double start, double end})>>{
+      for (final d in days) _dateOnly(d): <({double start, double end})>[],
+    };
+
+    for (final e in entries) {
+      final sAt = e.sleepStartAt;
+      final eAt = e.sleepEndAt;
+      if (sAt == null || eAt == null) continue;
+
+      final dayKey = _sleepDayKey(e);
+      if (!map.containsKey(dayKey)) continue;
+
+      final s = _hourOfDay(sAt);
+      final ed = _hourOfDay(eAt);
+
+      map[dayKey]!.add((start: s, end: ed));
+    }
+
+    return map;
+  }
+
+  // -----------------------------------------------------
+  // ✅ "기상일 기준" sleepDuration 합산
+  // - unknown(-1), 0 제외
+  // -----------------------------------------------------
+  double _sumSleepDurationForWakeDay(
+    List<DiaryEntry> entries,
+    DateTime dayKey,
+  ) {
+    double sum = 0.0;
+
+    for (final e in entries) {
+      final eKey = _sleepDayKey(e);
+      if (eKey != dayKey) continue;
+
+      if (e.sleepDuration <= 0) continue;
+      sum += e.sleepDuration;
+    }
+
+    return sum;
+  }
+
+  // -----------------------------------------------------
+  // ✅ day helpers (calendar 기준)
+  // -----------------------------------------------------
+  List<DateTime> _lastNDays(DateTime todayKey, int n) {
+    return List.generate(
+      n,
+      (i) => todayKey.subtract(Duration(days: n - 1 - i)),
+    );
+  }
+
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  // -----------------------------------------------------
+  // ✅ 시간 helpers
+  // -----------------------------------------------------
+  double _hourOfDay(DateTime dt) => dt.hour + dt.minute / 60.0;
+
+  String _formatHourLabel(double hour) {
+    final h = hour.floor();
+    final m = ((hour - h) * 60).round();
+    final hh = h.toString().padLeft(2, '0');
+    final mm = m.toString().padLeft(2, '0');
+    return "$hh:$mm";
   }
 
   // ---------------------------
@@ -414,7 +625,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   }
 
   // ---------------------------
-  // Helpers: 날짜/필터
+  // Helpers: Nightmare 기간/라벨
   // ---------------------------
   DateTime? _startForRange(DateTime now, NightmareRange range) {
     switch (range) {
@@ -443,7 +654,6 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   }
 
   DateTime _subtractMonths(DateTime date, int months) {
-    // 간단 안전 버전: month 계산 후 day clamp
     final int year = date.year;
     final int month = date.month - months;
     int newYear = year;
@@ -468,13 +678,6 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       date.microsecond,
     );
   }
-
-  List<DateTime> _lastNDays(DateTime now, int n) {
-    final today = _dateOnly(now);
-    return List.generate(n, (i) => today.subtract(Duration(days: n - 1 - i)));
-  }
-
-  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
   // ---------------------------
   // Nightmare 판단

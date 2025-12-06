@@ -16,6 +16,7 @@ import '../domain/diary_entry.dart';
 import 'diary_detail_screen.dart';
 
 class DiaryEditorScreen extends ConsumerStatefulWidget {
+  /// ✅ 선택한 날짜는 "기상일(=아침에 깬 날짜)" 개념으로 사용
   final DateTime selectedDate;
   final DiaryEntry? existingEntry;
 
@@ -32,10 +33,8 @@ class DiaryEditorScreen extends ConsumerStatefulWidget {
 class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
   late TextEditingController _textController;
 
-  /// 시간이 정확히 기억 안 나는 경우
   bool _isSleepUnknown = false;
 
-  /// 잠든 시간 / 깬 시간 (시/분만)
   TimeOfDay _sleepStart = const TimeOfDay(hour: 23, minute: 0);
   TimeOfDay _sleepEnd = const TimeOfDay(hour: 7, minute: 0);
 
@@ -47,9 +46,21 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     if (existing != null) {
       _textController = TextEditingController(text: existing.content);
 
-      // ✅ 현재 모델은 "수면 구간"이 아니라 "수면 시간 값"만 있음
-      // sleepDuration < 0 이면 unknown 처리
+      // unknown 결정
       _isSleepUnknown = existing.sleepDuration < 0;
+
+      // ✅ interval 있으면 UI 복원
+      if (existing.sleepStartAt != null && existing.sleepEndAt != null) {
+        _sleepStart = TimeOfDay(
+          hour: existing.sleepStartAt!.hour,
+          minute: existing.sleepStartAt!.minute,
+        );
+        _sleepEnd = TimeOfDay(
+          hour: existing.sleepEndAt!.hour,
+          minute: existing.sleepEndAt!.minute,
+        );
+        _isSleepUnknown = false;
+      }
     } else {
       _textController = TextEditingController();
       _isSleepUnknown = false;
@@ -62,7 +73,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     super.dispose();
   }
 
-  // ───────────────── 헬퍼들 (시간 계산) ─────────────────
+  // ───────────────── 헬퍼들 ─────────────────
 
   String _formatTime(TimeOfDay t) {
     final now = DateTime.now();
@@ -80,103 +91,130 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     );
   }
 
-  /// baseDate 기준으로 수면 시간 계산 (시간 단위)
-  /// 규칙:
-  ///  - end가 start보다 같거나 이르면 start를 하루 전으로 간주(자정 넘김)
-  double _computeSleepHours(DateTime baseDate) {
-    if (_isSleepUnknown) return -1.0;
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
-    DateTime start = _buildDateTime(baseDate, _sleepStart);
-    DateTime end = _buildDateTime(baseDate, _sleepEnd);
+  bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
 
+  /// ✅ 저장용 "일기 날짜"는 항상 날짜-only로 고정
+  ///    - 이렇게 해야 logicalDay 캘린더 붙는 기준이 흔들리지 않음
+  DateTime _diaryDateForSave({required bool isEditMode}) {
+    final raw = isEditMode
+        ? (widget.existingEntry?.date ?? widget.selectedDate)
+        : widget.selectedDate;
+    return _dateOnly(raw);
+  }
+
+  /// ✅ 선택된 start/end로 "실제 interval" 만들기
+  /// - baseDate는 "기상일(=선택한 날짜)"로 간주
+  /// - end <= start면 start를 하루 전으로 간주 (자정 넘김)
+  ({DateTime start, DateTime end}) _buildInterval(DateTime wakeDate) {
+    DateTime start = _buildDateTime(wakeDate, _sleepStart);
+    DateTime end = _buildDateTime(wakeDate, _sleepEnd);
+
+    // ✅ 23:00 ~ 07:00 같은 케이스면
+    //    start를 전날로 내려서 5일 23시 ~ 6일 07시 저장
     if (!end.isAfter(start)) {
       start = start.subtract(const Duration(days: 1));
     }
 
-    final minutes = end.difference(start).inMinutes;
-    if (minutes <= 0) return 0.0;
-    return minutes / 60.0;
+    return (start: start, end: end);
   }
 
-  /// 화면 표시용 문자열
-  String _sleepLabel(DateTime baseDate) {
-    final h = _computeSleepHours(baseDate);
-    if (h < 0) return "Unknown";
+  double _durationFromInterval(DateTime start, DateTime end) {
+    final mins = end.difference(start).inMinutes;
+    if (mins <= 0) return 0.0;
+    return mins / 60.0;
+  }
+
+  String _sleepLabel(DateTime wakeDate) {
+    if (_isSleepUnknown) return "Unknown";
+
+    final itv = _buildInterval(wakeDate);
+    final h = _durationFromInterval(itv.start, itv.end);
     return "${h.toStringAsFixed(1)} Hours";
   }
 
-  bool _sameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
-  }
+  // ─────────────────
+  // ✅ 기존 기록 구간 텍스트용
+  // ─────────────────
 
-  // ─────────────────────────────
-  // ✅ 현재 모델에서 가능한 현실적 방어
-  // ─────────────────────────────
-
-  /// 같은 dream day(logicalDay) 안에
-  /// "sleepDuration >= 0" 기록이 이미 있으면 또 막는다.
-  bool _hasSleepRecordConflictForDay({
-    required DateTime baseDate,
-    required String currentId,
-    required List<DiaryEntry> all,
-    required double candidateSleepHours,
-  }) {
-    if (candidateSleepHours < 0) return false; // unknown이면 허용
-
-    final candDay = _safeLogicalDay(baseDate);
-
-    for (final e in all) {
-      if (e.id == currentId) continue;
-      if (e.sleepDuration < 0) continue;
-
-      final eDay = _safeLogicalDay(e.date);
-      if (_sameDay(candDay, eDay)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /// logicalDay()가 모델에 없을 수도 있으니 안전 래퍼
-  DateTime _safeLogicalDay(DateTime date) {
-    try {
-      // ignore: invalid_use_of_protected_member
-      // 만약 DiaryEntry에 logicalDay()가 이미 구현되어 있으면 아래가 더 정확
-      // 하지만 여기선 date 기반 fallback
-      return DateTime(date.year, date.month, date.day);
-    } catch (_) {
-      return DateTime(date.year, date.month, date.day);
-    }
-  }
-
-  double _getRecordedSleepHoursForDay({
-    required DateTime baseDate,
-    required String currentId,
-    required List<DiaryEntry> all,
-  }) {
-    final day = _safeLogicalDay(baseDate);
-    double sum = 0;
-
-    for (final e in all) {
-      if (e.id == currentId) continue;
-      if (e.sleepDuration < 0) continue;
-      final eDay = _safeLogicalDay(e.date);
-      if (_sameDay(day, eDay)) {
-        sum += e.sleepDuration;
-      }
-    }
-    return sum;
-  }
-
-  void _showSleepConflictSnackBar() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          '이미 이 날짜(꿈 하루 기준)에 수면 시간이 기록돼 있어요.\n'
-          '다른 날짜를 선택하거나 "Don\'t Know"로 설정해 주세요.',
-        ),
-      ),
+  List<DiaryEntry> _entriesOfSameDreamDay(
+      DateTime baseDate, List<DiaryEntry> all) {
+    // dream-day 기준은 모델 logicalDay() 사용
+    final dummy = DiaryEntry(
+      id: "dummy",
+      date: baseDate,
+      content: "",
     );
+    final day = dummy.logicalDay();
+
+    return all.where((e) {
+      return _sameDay(e.logicalDay(), day);
+    }).toList();
+  }
+
+  String _formatInterval(DateTime s, DateTime e) {
+    final f = DateFormat('HH:mm');
+    return "${f.format(s)}~${f.format(e)}";
+  }
+
+  // ─────────────────
+  // ✅ POST 시점 검증
+  // ─────────────────
+
+  bool _intervalOverlap(
+      DateTime aStart, DateTime aEnd, DateTime bStart, DateTime bEnd) {
+    return aStart.isBefore(bEnd) && bStart.isBefore(aEnd);
+  }
+
+  /// ✅ 반환값이 null이면 통과, String이면 에러 메시지
+  String? _validateSleepOnPost({
+    required DiaryEntry candidate,
+    required List<DiaryEntry> all,
+  }) {
+    // unknown이면 검증 스킵
+    if (candidate.sleepDuration < 0) return null;
+
+    final baseDate = candidate.date;
+    final sameDayEntries = _entriesOfSameDreamDay(baseDate, all)
+        .where((e) => e.id != candidate.id)
+        .toList();
+
+    // 1) 총합 24h 검사
+    double existingTotal = 0.0;
+    for (final e in sameDayEntries) {
+      if (e.sleepDuration > 0) {
+        existingTotal += e.sleepDuration;
+      }
+    }
+
+    final newTotal = existingTotal + candidate.sleepDuration;
+    if (newTotal > 24.0 + 1e-6) {
+      final remain = (24.0 - existingTotal).clamp(0.0, 24.0);
+      return "수면 시간이 24시간을 초과했어요.\n"
+          "오늘 남은 수면 가능 시간: ${remain.toStringAsFixed(1)}h\n"
+          "시간을 다시 수정해 주세요.";
+    }
+
+    // 2) 구간 겹침 검사
+    if (candidate.sleepStartAt != null && candidate.sleepEndAt != null) {
+      for (final e in sameDayEntries) {
+        if (e.sleepStartAt == null || e.sleepEndAt == null) continue;
+
+        if (_intervalOverlap(
+          candidate.sleepStartAt!,
+          candidate.sleepEndAt!,
+          e.sleepStartAt!,
+          e.sleepEndAt!,
+        )) {
+          return "이미 기록된 수면 구간과 겹쳐요.\n"
+              "시간을 다시 수정해 주세요.";
+        }
+      }
+    }
+
+    return null;
   }
 
   // ───────────────── 저장 로직 ─────────────────
@@ -190,18 +228,30 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
       return;
     }
 
-    final bool isEditMode = widget.existingEntry != null;
-    final baseDate =
-        isEditMode ? widget.existingEntry!.date : widget.selectedDate;
+    final isEditMode = widget.existingEntry != null;
 
-    final sleepHours = _computeSleepHours(baseDate);
+    // ✅ 저장 기준 날짜 고정
+    final diaryDate = _diaryDateForSave(isEditMode: isEditMode);
+
+    DateTime? sAt;
+    DateTime? eAt;
+    double sleepHours = -1.0;
+
+    if (!_isSleepUnknown) {
+      final itv = _buildInterval(diaryDate); // ✅ diaryDate == 기상일
+      sAt = itv.start;
+      eAt = itv.end;
+      sleepHours = _durationFromInterval(sAt, eAt);
+    }
 
     final draftEntry = DiaryEntry(
       id: isEditMode ? widget.existingEntry!.id : const Uuid().v4(),
-      date: baseDate,
+      date: diaryDate,
       content: text,
       mood: isEditMode ? widget.existingEntry!.mood : "📝",
       sleepDuration: sleepHours,
+      sleepStartAt: sAt,
+      sleepEndAt: eAt,
       isDraft: true,
       isSold: isEditMode ? widget.existingEntry!.isSold : false,
       imageUrl: isEditMode ? widget.existingEntry!.imageUrl : null,
@@ -209,20 +259,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
       interpretation: isEditMode ? widget.existingEntry!.interpretation : null,
     );
 
-    final allDiaries = ref.read(diaryListProvider);
-    final currentId = draftEntry.id;
-
-    // ✅ dream day 단위 수면 기록 중복 방지
-    if (_hasSleepRecordConflictForDay(
-      baseDate: baseDate,
-      currentId: currentId,
-      all: allDiaries,
-      candidateSleepHours: sleepHours,
-    )) {
-      _showSleepConflictSnackBar();
-      return;
-    }
-
+    // ✅ Draft는 검증 없이 저장
     if (isEditMode) {
       ref.read(diaryListProvider.notifier).updateDiary(draftEntry);
     } else {
@@ -244,15 +281,58 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     if (text.length < minLength) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-              Text("Too short! Please write at least $minLength characters."),
+          content: Text("Too short! Please write at least $minLength characters."),
           backgroundColor: Colors.redAccent,
         ),
       );
       return;
     }
 
-    // 👉 LLM 돌리기 전에 다이얼로그
+    final isEditMode = widget.existingEntry != null;
+
+    // ✅ 저장 기준 날짜 고정
+    final diaryDate = _diaryDateForSave(isEditMode: isEditMode);
+
+    // ✅ POST 전 수면 값 계산
+    DateTime? sAt;
+    DateTime? eAt;
+    double sleepHours = -1.0;
+
+    if (!_isSleepUnknown) {
+      final itv = _buildInterval(diaryDate); // ✅ 6일 23-07 → 5일23 ~ 6일07
+      sAt = itv.start;
+      eAt = itv.end;
+      sleepHours = _durationFromInterval(sAt, eAt);
+    }
+
+    // ✅ 1) LLM 전에 "수면 검증" 먼저 수행 (POST 버튼에서만!)
+    final tempEntryForValidation = DiaryEntry(
+      id: isEditMode ? widget.existingEntry!.id : "temp",
+      date: diaryDate,
+      content: text,
+      mood: isEditMode ? widget.existingEntry!.mood : "🌿",
+      sleepDuration: sleepHours,
+      sleepStartAt: sAt,
+      sleepEndAt: eAt,
+      isSold: isEditMode ? widget.existingEntry!.isSold : false,
+      isDraft: false,
+      imageUrl: isEditMode ? widget.existingEntry!.imageUrl : null,
+      summary: isEditMode ? widget.existingEntry!.summary : null,
+      interpretation: isEditMode ? widget.existingEntry!.interpretation : null,
+    );
+
+    final allDiaries = ref.read(diaryListProvider);
+    final err =
+        _validateSleepOnPost(candidate: tempEntryForValidation, all: allDiaries);
+    if (err != null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(err)),
+      );
+      return;
+    }
+
+    // 👉 2) 검증 통과했을 때만 LLM 로딩
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -286,40 +366,20 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
       final imageUrl = results[0] as String;
       final analysis = results[1] as Map<String, String>;
 
-      final bool isEditMode = widget.existingEntry != null;
-      final baseDate =
-          isEditMode ? widget.existingEntry!.date : widget.selectedDate;
-
-      final sleepHours = _computeSleepHours(baseDate);
-
       final newEntry = DiaryEntry(
         id: isEditMode ? widget.existingEntry!.id : const Uuid().v4(),
-        date: baseDate,
+        date: diaryDate, // ✅ 날짜-only 고정
         content: text,
         imageUrl: imageUrl,
         summary: analysis['summary'],
         interpretation: analysis['interpretation'],
         mood: analysis['mood'] ?? "🌿",
         sleepDuration: sleepHours,
+        sleepStartAt: sAt,
+        sleepEndAt: eAt,
         isSold: isEditMode ? widget.existingEntry!.isSold : false,
         isDraft: false,
       );
-
-      final allDiaries = ref.read(diaryListProvider);
-      final currentId = newEntry.id;
-
-      // ✅ dream day 단위 수면 기록 중복 방지
-      if (_hasSleepRecordConflictForDay(
-        baseDate: baseDate,
-        currentId: currentId,
-        all: allDiaries,
-        candidateSleepHours: sleepHours,
-      )) {
-        if (!mounted) return;
-        Navigator.pop(context);
-        _showSleepConflictSnackBar();
-        return;
-      }
 
       if (isEditMode) {
         await ref.read(diaryListProvider.notifier).updateDiary(newEntry);
@@ -329,7 +389,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
       }
 
       if (!mounted) return;
-      Navigator.pop(context);
+      Navigator.pop(context); // 로딩 닫기
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -345,7 +405,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context);
+      Navigator.pop(context); // 로딩 닫기
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Failed to analyze.")),
       );
@@ -356,7 +416,8 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final displayDate = widget.existingEntry?.date ?? widget.selectedDate;
+    // ✅ 표시용 날짜도 날짜-only로 안정화
+    final displayDate = _dateOnly(widget.existingEntry?.date ?? widget.selectedDate);
     final dateStr = DateFormat('yyyy/MM/dd (E)').format(displayDate);
 
     return Scaffold(
@@ -397,9 +458,9 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                   color: Color.fromARGB(255, 129, 129, 129),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
 
-              // 수면 시간 입력 박스 (Glass + Wobbly)
+              /// ✅ 상단 수면 카드 크기 "살짝" 줄이기
               ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: BackdropFilter(
@@ -409,12 +470,15 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                     borderColor: Colors.white.withOpacity(0.45),
                     borderRadius: 20,
                     padding: EdgeInsets.zero,
-                    child: _buildSleepCard(context, displayDate),
+                    child: SizedBox(
+                      height: 200,
+                      child: _buildSleepCard(context, displayDate),
+                    ),
                   ),
                 ),
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 22),
 
               const Text(
                 "Write your dream (min 20 chars)",
@@ -424,9 +488,8 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                   color: Colors.white,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
 
-              // 내용 입력
               Expanded(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(20),
@@ -460,7 +523,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -486,27 +549,36 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
   }
 
   /// 수면 입력 카드 내부 UI
-  Widget _buildSleepCard(BuildContext context, DateTime baseDate) {
+  Widget _buildSleepCard(BuildContext context, DateTime wakeDate) {
     final all = ref.watch(diaryListProvider);
-    final currentId = widget.existingEntry?.id ?? "__new__";
+    final sameDayEntries = _entriesOfSameDreamDay(wakeDate, all)
+        .where((e) => e.id != (widget.existingEntry?.id ?? ""))
+        .toList();
 
-    // 이미 같은 dream day에 기록된 known 수면시간(총합)
-    final recordedHours = _getRecordedSleepHoursForDay(
-      baseDate: baseDate,
-      currentId: currentId,
-      all: all,
-    );
+    // ✅ 이미 기록된 구간 텍스트 생성
+    final recordedIntervals = <String>[];
+    double existingTotal = 0.0;
+
+    for (final e in sameDayEntries) {
+      if (e.sleepDuration > 0) {
+        existingTotal += e.sleepDuration;
+      }
+      if (e.sleepStartAt != null && e.sleepEndAt != null) {
+        recordedIntervals.add(_formatInterval(e.sleepStartAt!, e.sleepEndAt!));
+      }
+    }
+
+    final remain = (24.0 - existingTotal).clamp(0.0, 24.0);
 
     return Column(
       children: [
-        // 탭 버튼 영역
         Row(
           children: [
             Expanded(
               child: InkWell(
                 onTap: () => setState(() => _isSleepUnknown = false),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
                     color: !_isSleepUnknown
                         ? const Color.fromARGB(255, 190, 150, 255)
@@ -529,14 +601,14 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
             ),
             const SizedBox(
               width: 1,
-              height: 40,
+              height: 34,
               child: VerticalDivider(color: Colors.white54),
             ),
             Expanded(
               child: InkWell(
                 onTap: () => setState(() => _isSleepUnknown = true),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
                     color: _isSleepUnknown
                         ? const Color.fromARGB(255, 190, 150, 255)
@@ -562,12 +634,11 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
 
         const Divider(height: 1, thickness: 1, color: Colors.white30),
 
-        // 내용 영역
         Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(12.0),
           child: _isSleepUnknown
               ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 10),
+                  padding: EdgeInsets.symmetric(vertical: 6),
                   child: Text(
                     "Sleep time will not be recorded.",
                     style: TextStyle(
@@ -579,6 +650,26 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // ✅ 안내 텍스트
+                    Text(
+                      "오늘 남은 수면 가능 시간: ${remain.toStringAsFixed(1)}h",
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      recordedIntervals.isEmpty
+                          ? "이미 기록된 구간: 없음"
+                          : "이미 기록된 구간: ${recordedIntervals.join(", ")}",
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
                     // 잠든 시간
                     Row(
                       children: [
@@ -592,26 +683,12 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                         const Spacer(),
                         TextButton(
                           onPressed: () async {
-                            final prev = _sleepStart;
                             final picked = await showTimePicker(
                               context: context,
                               initialTime: _sleepStart,
                             );
-                            if (picked == null) return;
-
-                            setState(() => _sleepStart = picked);
-
-                            final candidate = _computeSleepHours(baseDate);
-                            final conflict = _hasSleepRecordConflictForDay(
-                              baseDate: baseDate,
-                              currentId: currentId,
-                              all: all,
-                              candidateSleepHours: candidate,
-                            );
-
-                            if (conflict) {
-                              setState(() => _sleepStart = prev); // 롤백
-                              _showSleepConflictSnackBar();
+                            if (picked != null) {
+                              setState(() => _sleepStart = picked);
                             }
                           },
                           child: Text(
@@ -624,7 +701,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
 
                     // 깬 시간
                     Row(
@@ -639,26 +716,12 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                         const Spacer(),
                         TextButton(
                           onPressed: () async {
-                            final prev = _sleepEnd;
                             final picked = await showTimePicker(
                               context: context,
                               initialTime: _sleepEnd,
                             );
-                            if (picked == null) return;
-
-                            setState(() => _sleepEnd = picked);
-
-                            final candidate = _computeSleepHours(baseDate);
-                            final conflict = _hasSleepRecordConflictForDay(
-                              baseDate: baseDate,
-                              currentId: currentId,
-                              all: all,
-                              candidateSleepHours: candidate,
-                            );
-
-                            if (conflict) {
-                              setState(() => _sleepEnd = prev); // 롤백
-                              _showSleepConflictSnackBar();
+                            if (picked != null) {
+                              setState(() => _sleepEnd = picked);
                             }
                           },
                           child: Text(
@@ -671,35 +734,12 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 6),
 
-                    // ✅ 안내 문구(현재 모델 한계에 맞춘 버전)
-                    if (recordedHours > 0)
-                      Text(
-                        "Already recorded sleep (dream-day): ${recordedHours.toStringAsFixed(1)}h",
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 11,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      )
-                    else
-                      const Text(
-                        "No sleep recorded yet for this dream-day.",
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 11,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-
-                    const SizedBox(height: 8),
-
-                    // 계산된 총 수면 시간
                     Align(
                       alignment: Alignment.centerRight,
                       child: Text(
-                        _sleepLabel(baseDate),
+                        _sleepLabel(wakeDate),
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
