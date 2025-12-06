@@ -1,28 +1,64 @@
+// lib/features/diary/presentation/diary_detail_screen.dart
+
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+
 import '../domain/diary_entry.dart';
-import '../../../shared/widgets/full_screen_image_viewer.dart';
-import 'diary_editor_screen.dart'; // 에디터 import 필요
 import '../application/diary_providers.dart';
-import '../application/shop_provider.dart'; // 판매 상태 체크용
-import '../application/user_provider.dart'; // 사용자 확인용
-import '../../../shared/widgets/glass_card.dart'; // GlassCard import 추가
-import 'dart:ui'; // ImageFilter를 사용하기 위해 추가
+import '../../../shared/widgets/full_screen_image_viewer.dart';
+import 'diary_editor_screen.dart';
+
+/// 공통으로 쓰는 glass 카드
+Widget glassCard({
+  required Widget child,
+  double radius = 20,
+  double opacity = 0.18,
+}) {
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(radius),
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(opacity),
+          borderRadius: BorderRadius.circular(radius),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.35),
+            width: 1.5,
+          ),
+        ),
+        child: child,
+      ),
+    ),
+  );
+}
 
 class DiaryDetailScreen extends ConsumerWidget {
+  /// 이미 DiaryEntry 객체를 넘기는 경우
   final DiaryEntry? entry;
+
+  /// id만 넘겨서 Provider에서 찾아오는 경우
   final String? entryId;
 
-  const DiaryDetailScreen({super.key, this.entry, this.entryId}) : assert(entry != null || entryId != null);
+  const DiaryDetailScreen({
+    super.key,
+    this.entry,
+    this.entryId,
+  }) : assert(entry != null || entryId != null);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final diaryList = ref.watch(diaryListProvider);
+
+    // entry가 없으면 id로 조회
     DiaryEntry? resolvedEntry = entry;
     if (resolvedEntry == null && entryId != null) {
       try {
-        resolvedEntry = diaryList.firstWhere((e) => e.id == entryId);
+        resolvedEntry =
+            diaryList.firstWhere((e) => e.id == entryId);
       } catch (_) {
         resolvedEntry = null;
       }
@@ -30,266 +66,285 @@ class DiaryDetailScreen extends ConsumerWidget {
 
     if (resolvedEntry == null) {
       return Scaffold(
-        appBar: AppBar(leading: const BackButton(color: Colors.black), title: const Text('Diary')),
-        body: const Center(child: Text('Diary not found')),
-      );
-    }
-
-    final e = resolvedEntry;
-    final userState = ref.watch(userProvider);
-    final shopItems = ref.watch(shopProvider);
-
-    // ⚡ 판매중인 일기인지 확인 (마켓에 등록되었지만 아직 안 팔린 경우)
-    final sellingItems = shopItems.where(
-      (item) => item.diaryId == e.id && !item.isSold,
-    ).toList();
-    final isCurrentlySelling = sellingItems.isNotEmpty;
-    final isOwner = isCurrentlySelling && sellingItems.first.sellerUid == userState.userId;
-
-    // ⚡ 팔린 일기 접근 제한 (단, 판매자 본인이 판매중인 일기는 예외)
-    if (e.isSold && !isOwner) {
-      return Scaffold(
         appBar: AppBar(
-          leading: const BackButton(color: Colors.black),
-          title: const Text('Access Denied', style: TextStyle(color: Colors.black)),
+          title: const Text(
+            'Diary',
+            style:
+                TextStyle(fontFamily: 'Stencil', fontWeight: FontWeight.bold),
+          ),
+          centerTitle: true,
+          backgroundColor: const Color(0xFFC0ABFF),
         ),
         body: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.lock, size: 80, color: Colors.grey),
-              SizedBox(height: 16),
-              Text(
-                'This diary has been sold',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Sold diaries can no longer be accessed.',
-                style: TextStyle(fontSize: 14, color: Colors.grey),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+          child: Text('Diary not found.'),
         ),
       );
     }
 
+    final dateStr =
+        DateFormat('yyyy.MM.dd (E)').format(resolvedEntry.date);
+
     return Scaffold(
-      extendBody: true, // Ensures the gradient fills the entire screen
       appBar: AppBar(
-        backgroundColor: const Color.fromARGB(255, 192, 171, 255), // 색깔 변경
-        leading: const BackButton(color: Color.fromARGB(255, 255, 255, 255)),
+        leading: const BackButton(color: Colors.white),
         title: Text(
-          DateFormat('yyyy/MM/dd (E)').format(e.date),
-          style: const TextStyle(color: Color.fromARGB(255, 255, 255, 255), fontWeight: FontWeight.bold, fontFamily: 'Stencil',),
+          dateStr,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Stencil',
+          ),
         ),
+        backgroundColor: const Color(0xFFC0ABFF),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit, color: Colors.white),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DiaryEditorScreen(
+                    selectedDate: resolvedEntry!.date,
+                    existingEntry: resolvedEntry,
+                  ),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.white),
+            onPressed: () => _confirmDelete(context, ref, resolvedEntry!.id),
+          ),
+        ],
       ),
       body: Container(
-        height: double.infinity, // Fill the entire height
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFE6E6FA), // Light purple
-              Color.fromARGB(255, 168, 152, 255),
-              Color.fromARGB(255, 152, 176, 255) // Dark purple
+              Color(0xFFE6E6FA),
+              Color(0xFFC0ABFF),
+              Color(0xFF99B0FF),
             ],
           ),
         ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 5), // 이미지와 Summary 텍스트의 시작점을 맞추기 위해 추가
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      if (e.imageUrl != null) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => FullScreenImageViewer(
-                              imageUrl: e.imageUrl!,
-                              tag: 'diaryImage_${e.id}',
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                    child: Hero(
-                      tag: 'diaryImage_${e.id}',
-                      child: Container(
-                        width: 140,
-                        height: 140,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(8),
-                          image: e.imageUrl != null
-                              ? DecorationImage(image: NetworkImage(e.imageUrl!), fit: BoxFit.cover)
-                              : null,
-                        ),
-                        child: e.imageUrl == null ? const Icon(Icons.image, color: Colors.grey) : null,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 상단 카드: 날짜 + 기분 + 수면시간
+                glassCard(
+                  radius: 22,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    child: Row(
                       children: [
-                        Padding(
-                          padding: EdgeInsets.only(right:270.0), // 수치적으로 조정 가능
-                          child: Text(
-                            "Summary",
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
+                        Text(
+                          resolvedEntry.mood,
+                          style: const TextStyle(fontSize: 28),
                         ),
-                        // padding 값을 변경하여 위치를 조정하세요.
-                        // 예: EdgeInsets.only(left: 32.0), EdgeInsets.symmetric(horizontal: 20.0) 등
-                        const SizedBox(height: 7),
-                        GlassCard(
-                          radius: 8,
-                          opacity: 0.2,
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              e.summary ?? "No summary",
-                              style: const TextStyle(fontSize: 15),
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 7),
-                        Padding(
-                          padding: EdgeInsets.only(right: 245.0), // 수치적으로 조정 가능
-                          child: Text(
-                            "Interpretation",
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                        ),
-                        const SizedBox(height: 7),
-                        GlassCard(
-                          radius: 8,
-                          opacity: 0.2,
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              e.interpretation ?? "No interpretation",
-                              style: const TextStyle(fontSize: 13),
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                dateStr,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                resolvedEntry.sleepDuration >= 0
+                                    ? "Sleep: ${resolvedEntry.sleepDuration.toStringAsFixed(1)} h"
+                                    : "Sleep: unknown",
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
-              
-              const SizedBox(height: 30),
-              
-              const Text("My Dream", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color.fromARGB(255, 255, 255, 255))),
-              const SizedBox(height: 8),
-              GlassCard(
-                radius: 8,
-                opacity: 0.2,
-                child: Container(
-                  width: double.infinity,
-                  constraints: const BoxConstraints(minHeight: 200),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.25),
-                    borderRadius: BorderRadius.circular(8),
+                ),
+
+                const SizedBox(height: 20),
+
+                // 이미지 카드
+                if (resolvedEntry.imageUrl != null)
+                  glassCard(
+                    radius: 22,
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => FullScreenImageViewer(
+                              imageUrl: resolvedEntry!.imageUrl!,
+                              tag: 'diary-image-${resolvedEntry.id}',
+                            ),
+                          ),
+                        );
+                      },
+                      child: Hero(
+                        tag: 'diary-image-${resolvedEntry.id}',
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(22),
+                          child: AspectRatio(
+                            aspectRatio: 4 / 3,
+                            child: Image.network(
+                              resolvedEntry.imageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: Colors.grey[300],
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  Icons.broken_image,
+                                  color: Colors.grey,
+                                  size: 40,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                  child: Text(
-                    e.content,
-                    style: const TextStyle(fontSize: 14, height: 1.5),
+
+                if (resolvedEntry.imageUrl != null)
+                  const SizedBox(height: 20),
+
+                // 요약 / 해석 카드
+                if (resolvedEntry.summary != null ||
+                    resolvedEntry.interpretation != null)
+                  glassCard(
+                    radius: 22,
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (resolvedEntry.summary != null) ...[
+                            const Text(
+                              "Summary",
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              resolvedEntry.summary!,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                          ],
+                          if (resolvedEntry.interpretation != null) ...[
+                            const Text(
+                              "Interpretation",
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              resolvedEntry.interpretation!,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+
+                if (resolvedEntry.summary != null ||
+                    resolvedEntry.interpretation != null)
+                  const SizedBox(height: 20),
+
+                // 원문 내용 카드
+                glassCard(
+                  radius: 22,
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Dream Story",
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          resolvedEntry.content,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            height: 1.5,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 40),
+              ],
+            ),
           ),
         ),
       ),
-      // ⚡ FloatingActionButton으로 편집 버튼 추가
-      floatingActionButton: _buildEditFAB(context, ref, e),
     );
   }
 
-  /// 편집 가능한지 확인: 판매중이 아니고 판매완료도 아닌 경우만
-  bool _canEdit(List<dynamic> shopItems, DiaryEntry entry) {
-    // 1. 이미 팔린 일기는 편집 불가
-    if (entry.isSold) return false;
-    
-    // 2. 현재 마켓에 등록된(판매중인) 일기는 편집 불가
-    final isCurrentlyListed = shopItems.any((item) => 
-      item is Map && item['diaryId'] == entry.id && item['isSold'] == false
-    );
-    if (isCurrentlyListed) return false;
-    
-    return true;
-  }
-
-  Widget? _buildEditFAB(BuildContext context, WidgetRef ref, DiaryEntry entry) {
-    final shopItems = ref.watch(shopProvider);
-    
-    // 편집 가능한 경우만 FAB 표시
-    if (_canEdit(shopItems, entry)) {
-      return FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => DiaryEditorScreen(
-                selectedDate: entry.date,
-                existingEntry: entry,
-              ),
-            ),
-          );
-        },
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(50),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.25),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.4),
-                  width: 1.5,
-                ),
-              ),
-              child: const Icon(
-                Icons.edit,
-                color: Colors.white,
-                size: 28,
-              ),
+  void _confirmDelete(
+      BuildContext context, WidgetRef ref, String entryId) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text("Delete Diary"),
+        content:
+            const Text("Are you sure you want to delete this diary entry?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              ref.read(diaryListProvider.notifier).deleteDiary(entryId);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Diary deleted.")),
+              );
+              Navigator.pop(context); // detail 화면 닫기
+            },
+            child: const Text(
+              "Delete",
+              style: TextStyle(color: Colors.red),
             ),
           ),
-        ),
-      );
-    }
-    return null; // 편집 불가능한 경우 null 반환
+        ],
+      ),
+    );
   }
-
-  
 }
