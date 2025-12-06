@@ -132,7 +132,14 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
                             fontFamily: 'Stencil',
-                            color: Color.fromARGB(255, 255, 255, 255)
+                            color: Color.fromARGB(255, 255, 255, 255),
+                            shadows: [
+                              Shadow(
+                                offset: Offset(1, 1),
+                                blurRadius: 2,
+                                color: Color.fromARGB(98, 216, 216, 216),
+                              ),
+                            ],
                           ),
                         ),
                         IconButton(
