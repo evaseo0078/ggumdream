@@ -1,3 +1,8 @@
+// lib/features/diary/presentation/diary_list_screen.dart
+
+import 'dart:ui';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -15,11 +20,10 @@ import '../domain/diary_entry.dart';
 import 'diary_detail_screen.dart';
 import 'diary_editor_screen.dart';
 
-import 'dart:ui';
-
-// ⚡ 뷰 모드 enum 추가
+/// 뷰 모드
 enum ViewMode { calendar, list, grid }
 
+/// 공통 글라스 카드 위젯
 Widget glassCard({
   required Widget child,
   double radius = 16,
@@ -52,22 +56,75 @@ class DiaryListScreen extends ConsumerStatefulWidget {
 }
 
 class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
-  ViewMode _viewMode = ViewMode.calendar; // ⚡ enum 사용
+  ViewMode _viewMode = ViewMode.calendar;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
 
   final int _maxActiveListings = 3;
 
+  // ✅ Stats / Editor와 동일 기준으로 dream-day cutoff 통일
+  static const int _cutoffHour = 18;
+
+  // ------------------------
+  // ✅ 날짜 유틸
+  // ------------------------
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  /// ✅ 캘린더/마커/필터의 "단일 진실 기준"
+  /// - 1순위: sleepEndAt(기상일)
+  /// - 2순위: dream logicalDay(cutoff=18)
+  DateTime _calendarDayKey(DiaryEntry e) {
+    if (e.sleepEndAt != null) {
+      return _dateOnly(e.sleepEndAt!);
+    }
+    return _dateOnly(e.logicalDay(cutoffHour: _cutoffHour));
+  }
+
+  // ------------------------
+  // ✅ Sleep 표시 헬퍼
+  // ------------------------
+  String _sleepText(DiaryEntry e) {
+    if (e.sleepDuration < 0) return "Sleep: unknown";
+
+    if (e.sleepStartAt != null && e.sleepEndAt != null) {
+      final f = DateFormat('HH:mm');
+      return "Sleep: ${e.sleepDuration.toStringAsFixed(1)} h "
+          "(${f.format(e.sleepStartAt!)}-${f.format(e.sleepEndAt!)})";
+    }
+
+    return "Sleep: ${e.sleepDuration.toStringAsFixed(1)} h";
+  }
+
+  /// ✅ 카드 날짜 표시 기준
+  /// - 캘린더 모드에서는 "캘린더 마커 기준과 동일"
+  /// - 리스트/그리드는 기존 date 유지
+  DateTime _displayDateForCard(DiaryEntry e) {
+    if (_viewMode == ViewMode.calendar) {
+      return _calendarDayKey(e);
+    }
+    return e.date;
+  }
+
   @override
   Widget build(BuildContext context) {
     final diaryList = ref.watch(diaryListProvider);
-    final displayList = (_viewMode == ViewMode.calendar && _selectedDay != null)
-        ? diaryList.where((entry) => isSameDay(entry.date, _selectedDay)).toList()
-        : diaryList;
+
+    // ✅ 캘린더 모드 + 날짜 선택 시:
+    // "sleepEndAt 우선" 캘린더 기준으로 필터링
+    final displayList =
+        (_viewMode == ViewMode.calendar && _selectedDay != null)
+            ? diaryList
+                .where((entry) => isSameDay(
+                      _calendarDayKey(entry),
+                      _selectedDay,
+                    ))
+                .toList()
+            : diaryList;
 
     return Scaffold(
       body: Stack(
         children: [
+          // 배경 그라디언트
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -75,19 +132,20 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                 end: Alignment.bottomCenter,
                 colors: [
                   Color.fromARGB(255, 255, 237, 253),
-                  Color.fromARGB(255, 205,230,246),
-                  Color.fromARGB(255, 172,193,242),
-                  Color.fromARGB(255, 211,202,239),
-                  Color.fromARGB(255, 137,180,239),
+                  Color.fromARGB(255, 205, 230, 246),
+                  Color.fromARGB(255, 172, 193, 242),
+                  Color.fromARGB(255, 211, 202, 239),
+                  Color.fromARGB(255, 137, 180, 239),
                   Color.fromARGB(255, 142, 124, 232),
                 ],
                 stops: [0.0, 0.3, 0.5, 0.7, 0.8, 1.0],
               ),
             ),
           ),
+          // 배경 이미지 오버레이
           Positioned.fill(
             child: Opacity(
-              opacity: 0.4, // Adjusted transparency
+              opacity: 0.4,
               child: Image.asset(
                 'assets/images/diary_list_background.png',
                 fit: BoxFit.cover,
@@ -97,6 +155,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
           SafeArea(
             child: CustomScrollView(
               slivers: [
+                // 상단 타이틀 & 모드 토글 & 음악 버튼
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
@@ -152,7 +211,9 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                           onPressed: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => const SleepModeScreen()),
+                              MaterialPageRoute(
+                                builder: (context) => const SleepModeScreen(),
+                              ),
                             );
                           },
                         ),
@@ -160,187 +221,220 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                     ),
                   ),
                 ),
+
+                // 캘린더 뷰
                 if (_viewMode == ViewMode.calendar)
                   SliverToBoxAdapter(
-  child: Center(
-    child: glassCard(
-      radius: 20,
-      opacity: 0.23,
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.86,
-        margin: const EdgeInsets.only(top: 10, bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: TableCalendar(
-          firstDay: DateTime.utc(2020, 1, 1),
-          lastDay: DateTime.utc(2030, 12, 31),
-          focusedDay: _focusedDay,
-          selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-
-          // ⚡ eventLoader 추가: 해당 날짜의 일기들을 반환
-          eventLoader: (day) {
-            return diaryList.where((entry) => isSameDay(entry.date, day)).toList();
-          },
-
-          onDaySelected: (selectedDay, focusedDay) {
-            setState(() {
-              if (_selectedDay != null && isSameDay(_selectedDay, selectedDay)) {
-                _selectedDay = null;
-              } else {
-                _selectedDay = selectedDay;
-              }
-              _focusedDay = focusedDay;
-            });
-          },
-
-          onPageChanged: (focusedDay) {
-            // 연도 제한 체크
-            if (focusedDay.year < 2023) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Cannot go further back in time.'),
-                  duration: Duration(seconds: 3),
-                ),
-              );
-              // 2023년 1월로 되돌리기
-              setState(() {
-                _focusedDay = DateTime(2023, 1, 1);
-              });
-            } else if (focusedDay.year > 2026) {
-              _showComingSoonDialog(context);
-              // 2026년 12월로 되돌리기
-              setState(() {
-                _focusedDay = DateTime(2026, 12, 31);
-              });
-            } else {
-              // 허용된 범위 내에서만 업데이트
-              setState(() {
-                _focusedDay = focusedDay;
-              });
-            }
-          },
-
-          headerStyle: const HeaderStyle(
-            formatButtonVisible: false,
-            titleCentered: true,
-            titleTextStyle: TextStyle(
-              fontFamily: 'Stencil',
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-            leftChevronPadding: EdgeInsets.zero,
-            rightChevronPadding: EdgeInsets.zero,
-          ),
-
-          calendarStyle: const CalendarStyle(
-            cellMargin: EdgeInsets.all(0),
-            cellPadding: EdgeInsets.all(2),
-            todayDecoration: BoxDecoration(
-              color: Color.fromARGB(255, 213, 215, 216),
-              shape: BoxShape.circle,
-            ),
-            selectedDecoration: BoxDecoration(
-              color: Color.fromARGB(255, 183, 150, 240),
-              shape: BoxShape.circle,
-            ),
-          ),
-
-          daysOfWeekStyle: const DaysOfWeekStyle(
-            weekdayStyle: TextStyle(fontSize: 11),
-            weekendStyle: TextStyle(fontSize: 11),
-          ),
-
-          calendarBuilders: CalendarBuilders(
-            markerBuilder: (context, date, events) {
-              if (events.isEmpty) return null;
-              
-              // ⚡ 해당 날짜의 모든 일기들의 mood 수집
-              final diaryEntries = events.cast<DiaryEntry>();
-              final moods = diaryEntries.map((e) => e.mood).toList();
-              
-              // 최대 2개까지 표시, 그 이상이면 + 추가
-              final displayMoods = moods.take(2).toList();
-              final hasMore = moods.length > 2;
-              
-              return Positioned(
-                bottom: 1,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ...displayMoods.map((mood) => Text(
-                      mood,
-                      style: const TextStyle(fontSize: 10),
-                    )),
-                    if (hasMore)
-                      const Text(
-                        '+',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    ),
-  ),
-),
-const SliverToBoxAdapter(
-  child: SizedBox(height: 10),  // ← 여기서 원하는 높이로 조절
-),
-
-                displayList.isEmpty
-                    ? SliverFillRemaining(
-                        child: Center(
-                          child: Text(
-                            _viewMode == ViewMode.calendar && _selectedDay != null
-                                ? "No dreams on this day.\nTap + to write!"
-                                : "Let's make your\nfirst post",
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 16, color: Colors.black54),
+                    child: Center(
+                      child: glassCard(
+                        radius: 20,
+                        opacity: 0.23,
+                        child: Container(
+                          width: MediaQuery.of(context).size.width * 0.86,
+                          margin: const EdgeInsets.only(top: 10, bottom: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
                           ),
-                        ),
-                      )
-                    : _viewMode == ViewMode.grid
-                        ? SliverPadding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            sliver: SliverGrid(
-                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3, // ⚡ 가로 3개
-                                crossAxisSpacing: 4,
-                                mainAxisSpacing: 4,
-                                childAspectRatio: 1, // 정사각형
+                          child: TableCalendar(
+                            firstDay: DateTime.utc(2020, 1, 1),
+                            lastDay: DateTime.utc(2030, 12, 31),
+                            focusedDay: _focusedDay,
+                            selectedDayPredicate: (day) =>
+                                isSameDay(_selectedDay, day),
+
+                            // ✅ 이벤트 로더:
+                            // "sleepEndAt 우선" 캘린더 기준으로 이벤트 매칭
+                            eventLoader: (day) {
+                              return diaryList
+                                  .where((entry) => isSameDay(
+                                        _calendarDayKey(entry),
+                                        day,
+                                      ))
+                                  .toList();
+                            },
+
+                            onDaySelected: (selectedDay, focusedDay) {
+                              setState(() {
+                                if (_selectedDay != null &&
+                                    isSameDay(_selectedDay, selectedDay)) {
+                                  _selectedDay = null;
+                                } else {
+                                  _selectedDay = selectedDay;
+                                }
+                                _focusedDay = focusedDay;
+                              });
+                            },
+
+                            onPageChanged: (focusedDay) {
+                              if (focusedDay.year < 2023) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Cannot go further back in time.',
+                                    ),
+                                    duration: Duration(seconds: 3),
+                                  ),
+                                );
+                                setState(() {
+                                  _focusedDay = DateTime(2023, 1, 1);
+                                });
+                              } else if (focusedDay.year > 2026) {
+                                _showComingSoonDialog(context);
+                                setState(() {
+                                  _focusedDay = DateTime(2026, 12, 31);
+                                });
+                              } else {
+                                setState(() {
+                                  _focusedDay = focusedDay;
+                                });
+                              }
+                            },
+
+                            headerStyle: const HeaderStyle(
+                              formatButtonVisible: false,
+                              titleCentered: true,
+                              titleTextStyle: TextStyle(
+                                fontFamily: 'Stencil',
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
                               ),
-                              delegate: SliverChildBuilderDelegate(
-                                (context, index) {
-                                  return _buildGridItem(context, displayList[index]);
-                                },
-                                childCount: displayList.length,
+                              leftChevronPadding: EdgeInsets.zero,
+                              rightChevronPadding: EdgeInsets.zero,
+                            ),
+
+                            calendarStyle: const CalendarStyle(
+                              cellMargin: EdgeInsets.all(0),
+                              cellPadding: EdgeInsets.all(2),
+                              todayDecoration: BoxDecoration(
+                                color: Color.fromARGB(255, 213, 215, 216),
+                                shape: BoxShape.circle,
+                              ),
+                              selectedDecoration: BoxDecoration(
+                                color: Color.fromARGB(255, 183, 150, 240),
+                                shape: BoxShape.circle,
                               ),
                             ),
-                          )
-                        : SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) {
-                                return Column(
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                                      child: _buildDiaryCard(context, ref, displayList[index]),
-                                    ),
-                                    const SizedBox(height: 10),
-                                  ],
+
+                            daysOfWeekStyle: const DaysOfWeekStyle(
+                              weekdayStyle: TextStyle(fontSize: 11),
+                              weekendStyle: TextStyle(fontSize: 11),
+                            ),
+
+                            calendarBuilders: CalendarBuilders(
+                              markerBuilder: (context, date, events) {
+                                if (events.isEmpty) return null;
+
+                                final diaryEntries =
+                                    events.whereType<DiaryEntry>().toList();
+                                if (diaryEntries.isEmpty) return null;
+
+                                final moods =
+                                    diaryEntries.map((e) => e.mood).toList();
+
+                                final displayMoods = moods.take(2).toList();
+                                final hasMore = moods.length > 2;
+
+                                return Positioned(
+                                  bottom: 1,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ...displayMoods.map(
+                                        (mood) => Text(
+                                          mood,
+                                          style:
+                                              const TextStyle(fontSize: 10),
+                                        ),
+                                      ),
+                                      if (hasMore)
+                                        const Text(
+                                          '+',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 );
                               },
-                              childCount: displayList.length,
                             ),
                           ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                const SliverToBoxAdapter(child: SizedBox(height: 10)),
+
+                // 리스트 / 그리드 / 비어있을 때
+                if (displayList.isEmpty)
+                  SliverFillRemaining(
+                    child: Center(
+                      child: Text(
+                        _viewMode == ViewMode.calendar &&
+                                _selectedDay != null
+                            ? "No dreams on this day.\nTap + to write!"
+                            : "Let's make your\nfirst post",
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ),
+                  )
+                else if (_viewMode == ViewMode.grid)
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    sliver: SliverGrid(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 4,
+                        mainAxisSpacing: 4,
+                        childAspectRatio: 1,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          return _buildGridItem(context, displayList[index]);
+                        },
+                        childCount: displayList.length,
+                      ),
+                    ),
+                  )
+                else
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        return Column(
+                          children: [
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              child: _buildDiaryCard(
+                                context,
+                                ref,
+                                displayList[index],
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+                        );
+                      },
+                      childCount: displayList.length,
+                    ),
+                  ),
+
                 const SliverToBoxAdapter(child: SizedBox(height: 80)),
               ],
             ),
           ),
         ],
       ),
+
+      // FABs
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
@@ -349,9 +443,7 @@ const SliverToBoxAdapter(
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const StatsScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const StatsScreen()),
               );
             },
             child: ClipRRect(
@@ -379,6 +471,7 @@ const SliverToBoxAdapter(
             ),
           ),
           const SizedBox(height: 16),
+
           // 작성 버튼
           GestureDetector(
             onTap: () {
@@ -386,7 +479,8 @@ const SliverToBoxAdapter(
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => DiaryEditorScreen(selectedDate: dateToWrite),
+                  builder: (context) =>
+                      DiaryEditorScreen(selectedDate: dateToWrite),
                 ),
               );
             },
@@ -419,211 +513,274 @@ const SliverToBoxAdapter(
     );
   }
 
-  Widget _buildDiaryCard(BuildContext context, WidgetRef ref, DiaryEntry entry) {
+  // ------------------------
+  // 카드 / 그리드 아이템들
+  // ------------------------
+
+  Widget _buildDiaryCard(
+    BuildContext context,
+    WidgetRef ref,
+    DiaryEntry entry,
+  ) {
     if (entry.isDraft) {
       return _buildDraftCard(context, ref, entry);
     }
 
     final shopItems = ref.watch(shopProvider);
-    
+
     ShopItem? matchingShopItem;
     try {
       matchingShopItem = shopItems.firstWhere(
-        (item) => item.diaryId == entry.id && item.ownerName == ref.read(userProvider).username,
+        (item) =>
+            item.diaryId == entry.id &&
+            item.ownerName == ref.read(userProvider).username,
       );
-    } catch (e) {
+    } catch (_) {
       matchingShopItem = null;
     }
 
     final bool isSoldOut = matchingShopItem != null && matchingShopItem.isSold;
     final bool isListed = matchingShopItem != null;
 
-    return GestureDetector(
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => DiaryDetailScreen(entry: entry)),
-    );
-  },
+    final displayDate = _displayDateForCard(entry);
+    final dateText = DateFormat('yyyy.MM.dd').format(displayDate);
 
-  child: Center( // 🔥 가운데 정렬
-    child: glassCard(
-      radius: 14,
-      opacity: 0.22,
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.86, // 🔥 카드 폭 줄이기
-        margin: const EdgeInsets.only(bottom: 14),       // 🔥 아래 간격 줄이기
-        padding: const EdgeInsets.all(10),               // 🔥 패딩 줄이기
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "${DateFormat('yyyy.MM.dd').format(entry.date)}  ${entry.mood}",
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                InkWell(
-                  onTap: () => _confirmDelete(context, ref, entry.id),
-                  child: const Icon(Icons.delete_outline, size: 20, color: Color.fromARGB(255, 70, 70, 70)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DiaryDetailScreen(entry: entry),
+          ),
+        );
+      },
+      child: Center(
+        child: glassCard(
+          radius: 14,
+          opacity: 0.22,
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.86,
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.all(10),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 72, // 🔥 조금 더 작게
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(12), // Rounded corners for images
-                  ),
-                  child: entry.imageUrl != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(12), // Match the container's rounded corners
-                          child: Image.network(entry.imageUrl!, fit: BoxFit.cover),
-                        )
-                      : const Icon(Icons.image, color: Colors.grey),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        entry.summary ?? entry.content,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      const SizedBox(height: 6),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: InkWell(
-                          onTap: () => _handleSellButtonTap(context, ref, entry, isSoldOut),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isSoldOut
-                                  ? const Color.fromARGB(255, 255, 255, 255)
-                                  : (isListed ? const Color.fromRGBO(255, 209, 150, 1) : const Color.fromARGB(100, 255, 255, 255)),
-                              borderRadius: BorderRadius.circular(12),
-                              
-                            ),
-                            child: Text(
-                              isSoldOut
-                                  ? "Sold Out"
-                                  : (isListed ? "Selling" : "Sell"),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Color.fromARGB(255, 71, 71, 71),
-                              ),
+                // 상단 날짜 + 이모지 + 삭제 버튼
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "$dateText  ${entry.mood}",
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _sleepText(entry),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.black54,
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    ),
-  ),
-);
-  }
-
-  Widget _buildDraftCard(BuildContext context, WidgetRef ref, DiaryEntry entry) {
-    return GestureDetector(
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => DiaryEditorScreen(
-          selectedDate: entry.date,
-          existingEntry: entry,
-        ),
-      ),
-    );
-  },
-
-  child: Center( // 🔥 가운데 정렬
-    child: glassCard(
-      radius: 12,
-      opacity: 0.20,
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.86, // 🔥 통일감
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      "${DateFormat('yyyy.MM.dd').format(entry.date)}  ${entry.mood}",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.orange,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        "DRAFT",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    InkWell(
+                      onTap: () => _confirmDelete(context, ref, entry.id),
+                      child: const Icon(
+                        Icons.delete_outline,
+                        size: 20,
+                        color: Color.fromARGB(255, 70, 70, 70),
                       ),
                     ),
                   ],
                 ),
-                InkWell(
-                  onTap: () => _confirmDelete(context, ref, entry.id),
-                  child: const Icon(Icons.delete_outline, size: 20),
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 썸네일
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: entry.imageUrl != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                entry.imageUrl!,
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          : const Icon(Icons.image, color: Colors.grey),
+                    ),
+                    const SizedBox(width: 10),
+                    // 내용 + 판매 버튼
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            entry.summary ?? entry.content,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          const SizedBox(height: 6),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: InkWell(
+                              onTap: () => _handleSellButtonTap(
+                                context,
+                                ref,
+                                entry,
+                                isSoldOut,
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSoldOut
+                                      ? const Color.fromARGB(255, 255, 255, 255)
+                                      : (isListed
+                                          ? const Color.fromRGBO(
+                                              255, 209, 150, 1)
+                                          : const Color.fromARGB(
+                                              100, 255, 255, 255)),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  isSoldOut
+                                      ? "Sold Out"
+                                      : (isListed ? "Selling" : "Sell"),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color.fromARGB(255, 71, 71, 71),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              entry.content.length > 50
-                  ? '${entry.content.substring(0, 50)}...'
-                  : entry.content,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, color: Colors.black87),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              "Tap to complete and analyze",
-              style: TextStyle(fontSize: 11, color: Colors.orange, fontStyle: FontStyle.italic),
-            ),
-          ],
+          ),
         ),
       ),
-    ),
-  ),
-);
-
+    );
   }
 
-  /// ⚡ Instagram 피드 스타일 Grid Item
+  Widget _buildDraftCard(
+    BuildContext context,
+    WidgetRef ref,
+    DiaryEntry entry,
+  ) {
+    final displayDate = _displayDateForCard(entry);
+    final dateText = DateFormat('yyyy.MM.dd').format(displayDate);
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DiaryEditorScreen(
+              selectedDate: entry.logicalDay(cutoffHour: _cutoffHour),
+              existingEntry: entry,
+            ),
+          ),
+        );
+      },
+      child: Center(
+        child: glassCard(
+          radius: 12,
+          opacity: 0.20,
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.86,
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 상단 날짜 + DRAFT + 삭제
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          "$dateText  ${entry.mood}",
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orange,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            "DRAFT",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    InkWell(
+                      onTap: () => _confirmDelete(context, ref, entry.id),
+                      child: const Icon(Icons.delete_outline, size: 20),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  entry.content.length > 50
+                      ? '${entry.content.substring(0, 50)}...'
+                      : entry.content,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  "Tap to complete and analyze",
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.orange,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Instagram 피드 스타일 Grid Item
   Widget _buildGridItem(BuildContext context, DiaryEntry entry) {
     return GestureDetector(
       onTap: () {
@@ -642,7 +799,6 @@ const SliverToBoxAdapter(
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // 이미지 표시
             if (entry.imageUrl != null)
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
@@ -652,24 +808,27 @@ const SliverToBoxAdapter(
                   errorBuilder: (context, error, stackTrace) {
                     return Container(
                       color: Colors.grey[300],
-                      child: const Icon(Icons.broken_image, color: Colors.grey),
+                      child: const Icon(
+                        Icons.broken_image,
+                        color: Colors.grey,
+                      ),
                     );
                   },
                 ),
               )
             else
-              // 이미지가 없는 경우 기본 아이콘
               const Center(
                 child: Icon(Icons.image, color: Colors.grey, size: 40),
               ),
-            
-            // Draft 뱃지 (draft인 경우)
+
+            // Draft 뱃지
             if (entry.isDraft)
               Positioned(
                 top: 4,
                 right: 4,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.orange,
                     borderRadius: BorderRadius.circular(4),
@@ -684,8 +843,8 @@ const SliverToBoxAdapter(
                   ),
                 ),
               ),
-            
-            // Mood 이모지 (하단 왼쪽)
+
+            // Mood 이모지
             Positioned(
               bottom: 4,
               left: 4,
@@ -707,10 +866,21 @@ const SliverToBoxAdapter(
     );
   }
 
-  void _handleSellButtonTap(BuildContext context, WidgetRef ref, DiaryEntry entry, bool isSoldOut) async {
+  // ------------------------
+  // 판매 관련 로직
+  // ------------------------
+
+  void _handleSellButtonTap(
+    BuildContext context,
+    WidgetRef ref,
+    DiaryEntry entry,
+    bool isSoldOut,
+  ) async {
     if (isSoldOut) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("This item is already sold and cannot be modified.")),
+        const SnackBar(
+          content: Text("This item is already sold and cannot be modified."),
+        ),
       );
       return;
     }
@@ -719,27 +889,38 @@ const SliverToBoxAdapter(
     ShopItem? matchingShopItem;
     try {
       matchingShopItem = shopItems.firstWhere(
-        (item) => item.diaryId == entry.id && item.ownerName == ref.read(userProvider).username,
+        (item) =>
+            item.diaryId == entry.id &&
+            item.ownerName == ref.read(userProvider).username,
       );
-    } catch (e) {
+    } catch (_) {
       matchingShopItem = null;
     }
 
     if (matchingShopItem != null) {
       _showEditOptions(context, ref, entry);
     } else {
-      final myActiveItems = ref.read(shopProvider).where(
-        (item) => item.ownerName == ref.read(userProvider).username && !item.isSold
-      ).length;
+      final myActiveItems = ref
+          .read(shopProvider)
+          .where(
+            (item) =>
+                item.ownerName == ref.read(userProvider).username &&
+                !item.isSold,
+          )
+          .length;
 
       if (myActiveItems >= _maxActiveListings) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Limit Reached! You can only have $_maxActiveListings active listings.")),
+          SnackBar(
+            content: Text(
+              "Limit Reached! You can only have $_maxActiveListings active listings.",
+            ),
+          ),
         );
         return;
       }
 
-      int? price = await _showPriceInputDialog(context);
+      final price = await _showPriceInputDialog(context);
       if (!context.mounted) return;
       if (price != null) {
         _registerToShop(context, ref, entry, price);
@@ -773,8 +954,12 @@ const SliverToBoxAdapter(
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
-                            color: !isFree ? const Color(0xFFAABCC5) : Colors.grey[200],
-                            borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
+                            color: !isFree
+                                ? const Color(0xFFAABCC5)
+                                : Colors.grey[200],
+                            borderRadius: const BorderRadius.horizontal(
+                              left: Radius.circular(8),
+                            ),
                           ),
                           alignment: Alignment.center,
                           child: Text(
@@ -797,8 +982,12 @@ const SliverToBoxAdapter(
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
-                            color: isFree ? const Color(0xFFAABCC5) : Colors.grey[200],
-                            borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
+                            color: isFree
+                                ? const Color(0xFFAABCC5)
+                                : Colors.grey[200],
+                            borderRadius: const BorderRadius.horizontal(
+                              right: Radius.circular(8),
+                            ),
                           ),
                           alignment: Alignment.center,
                           child: Text(
@@ -817,7 +1006,10 @@ const SliverToBoxAdapter(
                 if (isFree)
                   const Text(
                     "Listed for 0 coins.",
-                    style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
+                    ),
                   )
                 else
                   TextField(
@@ -829,10 +1021,15 @@ const SliverToBoxAdapter(
                       suffixText: "coins",
                       errorText: errorText,
                       border: const OutlineInputBorder(),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
                     ),
-                    onChanged: (value) {
-                      if (errorText != null) setState(() => errorText = null);
+                    onChanged: (_) {
+                      if (errorText != null) {
+                        setState(() => errorText = null);
+                      }
                     },
                   ),
               ],
@@ -872,7 +1069,11 @@ const SliverToBoxAdapter(
     );
   }
 
-  void _showEditOptions(BuildContext context, WidgetRef ref, DiaryEntry entry) {
+  void _showEditOptions(
+    BuildContext context,
+    WidgetRef ref,
+    DiaryEntry entry,
+  ) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -882,18 +1083,26 @@ const SliverToBoxAdapter(
           TextButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
-              int? newPrice = await _showPriceInputDialog(context);
+              final newPrice = await _showPriceInputDialog(context);
               if (!context.mounted) return;
               if (newPrice != null) {
                 try {
                   final shopItems = ref.read(shopProvider);
                   final matchingItem = shopItems.firstWhere(
-                    (item) => item.diaryId == entry.id && item.ownerName == ref.read(userProvider).username,
+                    (item) =>
+                        item.diaryId == entry.id &&
+                        item.ownerName == ref.read(userProvider).username,
                   );
-                  ref.read(shopProvider.notifier).updatePrice(matchingItem.id, newPrice);
-                  ref.read(userProvider.notifier).updateSalePrice(entry.id, newPrice);
+                  ref
+                      .read(shopProvider.notifier)
+                      .updatePrice(matchingItem.id, newPrice);
+                  ref
+                      .read(userProvider.notifier)
+                      .updateSalePrice(entry.id, newPrice);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Price updated to $newPrice coins!")),
+                    SnackBar(
+                      content: Text("Price updated to $newPrice coins!"),
+                    ),
                   );
                 } catch (e) {
                   debugPrint("Error: $e");
@@ -907,16 +1116,23 @@ const SliverToBoxAdapter(
               Navigator.pop(dialogContext);
               _cancelSale(context, ref, entry);
             },
-            child: const Text("Stop Selling", style: TextStyle(color: Colors.red)),
+            child: const Text(
+              "Stop Selling",
+              style: TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _registerToShop(BuildContext context, WidgetRef ref, DiaryEntry entry, int price) async {
+  void _registerToShop(
+    BuildContext context,
+    WidgetRef ref,
+    DiaryEntry entry,
+    int price,
+  ) async {
     try {
-      // Firestore에 등록하고 생성된 ShopItem을 받아옴
       final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
       if (currentUser == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -924,18 +1140,15 @@ const SliverToBoxAdapter(
         );
         return;
       }
-      
+
       final newItem = await ref.read(shopProvider.notifier).createListing(
-        diary: entry,
-        ownerId: currentUser.uid, // Firebase UID 직접 사용
-        ownerName: ref.read(userProvider).username,
-        price: price,
-      );
-      
-      // 일기 상태 업데이트
+            diary: entry,
+            ownerId: currentUser.uid,
+            ownerName: ref.read(userProvider).username,
+            price: price,
+          );
+
       ref.read(diaryListProvider.notifier).setSellStatus(entry.id, true);
-      
-      // 사용자 판매 이력에 추가
       ref.read(userProvider.notifier).recordSale(newItem);
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -957,13 +1170,23 @@ const SliverToBoxAdapter(
     );
   }
 
-  void _confirmDelete(BuildContext context, WidgetRef ref, String entryId) {
+  // ------------------------
+  // 삭제 / Coming Soon 다이얼로그
+  // ------------------------
+
+  void _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    String entryId,
+  ) {
     showDialog(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
           title: const Text("Delete Diary"),
-          content: const Text("Are you sure you want to delete this diary entry?"),
+          content: const Text(
+            "Are you sure you want to delete this diary entry?",
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
@@ -977,7 +1200,10 @@ const SliverToBoxAdapter(
                   const SnackBar(content: Text("Diary deleted.")),
                 );
               },
-              child: const Text("Delete", style: TextStyle(color: Colors.red)),
+              child: const Text(
+                "Delete",
+                style: TextStyle(color: Colors.red),
+              ),
             ),
           ],
         );
@@ -991,7 +1217,6 @@ const SliverToBoxAdapter(
       barrierDismissible: true,
       barrierColor: Colors.black54,
       builder: (context) {
-        // 4초 후 자동으로 닫기
         Future.delayed(const Duration(seconds: 4), () {
           if (Navigator.of(context).canPop()) {
             Navigator.of(context).pop();
@@ -1018,7 +1243,6 @@ const SliverToBoxAdapter(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 애니메이션 로켓 아이콘
                   TweenAnimationBuilder<double>(
                     tween: Tween(begin: 0.5, end: 1.2),
                     duration: const Duration(milliseconds: 3000),
@@ -1035,8 +1259,6 @@ const SliverToBoxAdapter(
                     },
                   ),
                   const SizedBox(height: 16),
-                  
-                  // 메인 메시지
                   const Text(
                     'Coming Soon!',
                     style: TextStyle(
@@ -1046,8 +1268,6 @@ const SliverToBoxAdapter(
                     ),
                   ),
                   const SizedBox(height: 8),
-                  
-                  // 서브 메시지
                   const Text(
                     'This feature will be available\nin the next version!',
                     textAlign: TextAlign.center,
@@ -1057,8 +1277,6 @@ const SliverToBoxAdapter(
                     ),
                   ),
                   const SizedBox(height: 12),
-                  
-                  // 기대 메시지
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
