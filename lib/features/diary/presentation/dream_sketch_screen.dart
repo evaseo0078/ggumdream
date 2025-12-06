@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:signature/signature.dart'; // signature 패키지 사용
+import 'package:signature/signature.dart';
 import 'package:ggumdream/shared/widgets/ggum_button.dart';
 import '../application/ai_provider.dart';
 import 'diary_editor_screen.dart';
@@ -14,11 +14,10 @@ class DreamSketchScreen extends ConsumerStatefulWidget {
 }
 
 class _DreamSketchScreenState extends ConsumerState<DreamSketchScreen> {
-  // 서명(그림) 컨트롤러 초기화
   final SignatureController _controller = SignatureController(
-    penStrokeWidth: 3, // 펜 두께
-    penColor: Colors.black, // 펜 색상
-    exportBackgroundColor: Colors.white, // 내보낼 때 배경색
+    penStrokeWidth: 3,
+    penColor: Colors.black,
+    exportBackgroundColor: Colors.white,
   );
 
   bool _isAnalyzing = false;
@@ -32,7 +31,7 @@ class _DreamSketchScreenState extends ConsumerState<DreamSketchScreen> {
   Future<void> _analyzeAndCreate() async {
     if (_controller.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please draw something first!")),
+        const SnackBar(content: Text("그림을 먼저 그려주세요!")),
       );
       return;
     }
@@ -40,33 +39,41 @@ class _DreamSketchScreenState extends ConsumerState<DreamSketchScreen> {
     setState(() => _isAnalyzing = true);
 
     try {
-      // 1. 캔버스를 PNG 이미지 바이트로 변환
+      // 1. 이미지를 PNG 바이트로 변환
       final Uint8List? imageBytes = await _controller.toPngBytes();
 
       if (imageBytes == null) {
-        throw Exception("Failed to export image");
+        throw Exception("이미지 변환 실패");
       }
 
-      // 2. Gemini에게 전송 및 해석 요청
+      // 2. Gemini 서비스 호출
       final geminiService = ref.read(geminiServiceProvider);
       final interpretation = await geminiService.analyzeDreamSketch(imageBytes);
 
       if (!mounted) return;
 
-      // 3. 결과 텍스트를 가지고 에디터 화면으로 이동 (스택 교체)
+      if (interpretation == null || interpretation.startsWith("오류")) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("분석 실패: $interpretation")),
+        );
+        setState(() => _isAnalyzing = false);
+        return;
+      }
+
+      // 3. 결과와 함께 다이어리 작성 화면으로 이동
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => DiaryEditorScreen(
             selectedDate: DateTime.now(),
-            initialContent: interpretation, // 생성된 해몽 텍스트 전달
+            initialContent: interpretation, // 해석된 텍스트 전달
           ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error analyzing sketch: $e")),
+        SnackBar(content: Text("오류가 발생했습니다: $e")),
       );
       setState(() => _isAnalyzing = false);
     }
@@ -75,16 +82,16 @@ class _DreamSketchScreenState extends ConsumerState<DreamSketchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE6E6FA), // 연한 보라색 배경
+      backgroundColor: const Color(0xFFE6E6FA),
       appBar: AppBar(
-        title: const Text("Draw Your Dream",
+        title: const Text("꿈 그리기",
             style: TextStyle(fontFamily: 'Stencil', color: Colors.white)),
         backgroundColor: const Color.fromARGB(255, 192, 171, 255),
         leading: const BackButton(color: Colors.white),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: () => _controller.clear(), // 지우기
+            onPressed: () => _controller.clear(),
           ),
         ],
       ),
@@ -95,8 +102,9 @@ class _DreamSketchScreenState extends ConsumerState<DreamSketchScreen> {
                 children: [
                   CircularProgressIndicator(color: Color(0xFFAABCC5)),
                   SizedBox(height: 20),
-                  Text("Interpreting your masterpiece...",
-                      style: TextStyle(fontFamily: 'Stencil')),
+                  Text("꿈을 분석하고 있어요...",
+                      style: TextStyle(
+                          fontFamily: 'Stencil', color: Colors.black54)),
                 ],
               ),
             )
@@ -133,10 +141,10 @@ class _DreamSketchScreenState extends ConsumerState<DreamSketchScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text("Sketch simply!",
+                      const Text("간단하게 그려보세요",
                           style: TextStyle(color: Colors.grey)),
                       GgumButton(
-                        text: "DONE",
+                        text: "완료",
                         onPressed: _analyzeAndCreate,
                         width: 120,
                       ),
