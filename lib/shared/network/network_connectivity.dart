@@ -9,8 +9,9 @@ enum NetworkStatus { online, offline }
 class NetworkNotifier extends StateNotifier<NetworkStatus> {
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _subscription;
+  final Ref _ref;
 
-  NetworkNotifier() : super(NetworkStatus.online) {
+  NetworkNotifier(this._ref) : super(NetworkStatus.online) {
     _init();
   }
 
@@ -31,11 +32,16 @@ class NetworkNotifier extends StateNotifier<NetworkStatus> {
         results.isEmpty || results.every((r) => r == ConnectivityResult.none);
     if (isDisconnected) {
       state = NetworkStatus.offline;
+      // Require user confirmation to dismiss overlay once offline occurs
+      _ref.read(overlayNeedsDismissProvider.notifier).state = true;
       return;
     }
     // Verify actual internet reachability
     final ok = await _hasInternet();
     state = ok ? NetworkStatus.online : NetworkStatus.offline;
+    if (!ok) {
+      _ref.read(overlayNeedsDismissProvider.notifier).state = true;
+    }
   }
 
   Future<bool> _hasInternet() async {
@@ -52,6 +58,10 @@ class NetworkNotifier extends StateNotifier<NetworkStatus> {
   Future<void> retry() async {
     final current = await _connectivity.checkConnectivity();
     await _updateFromConnectivity(current);
+    // If now online after explicit retry, dismiss overlay
+    if (state == NetworkStatus.online) {
+      _ref.read(overlayNeedsDismissProvider.notifier).state = false;
+    }
   }
 
   @override
@@ -63,5 +73,11 @@ class NetworkNotifier extends StateNotifier<NetworkStatus> {
 
 final networkStatusProvider =
     StateNotifierProvider<NetworkNotifier, NetworkStatus>((ref) {
-  return NetworkNotifier();
+  return NetworkNotifier(ref);
 });
+
+/// Tracks whether the offline caption should remain visible
+/// even if connectivity is restored automatically. It is set to true
+/// when an offline state is detected, and only set to false when the user
+/// taps Retry and connectivity is confirmed.
+final overlayNeedsDismissProvider = StateProvider<bool>((ref) => false);

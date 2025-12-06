@@ -1,10 +1,12 @@
+import 'dart:ui';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:ggumdream/widgets/logo_particle_animation.dart';
 
 import 'auth_provider.dart';
-
-import 'dart:ui';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -16,27 +18,76 @@ class LoginPage extends ConsumerStatefulWidget {
 class _LoginPageState extends ConsumerState<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
   bool _isLoading = false;
   bool _isPasswordVisible = false;
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
+  // -----------------------------
+  // Basic email validation
+  // -----------------------------
+  bool _isValidEmail(String email) {
+    // Simple and not too strict
+    final regex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+    return regex.hasMatch(email);
+  }
+
+  // -----------------------------
+  // Two-message policy for auth failures
+  // 1) invalid email format
+  // 2) email or password incorrect
+  // -----------------------------
+  String _mapRawErrorToMessage(String raw) {
+    final s = raw.toLowerCase();
+
+    // invalid email only
+    if (s.contains('invalid-email')) {
+      return 'Invalid email format.';
+    }
+
+    // Everything else -> unify
+    // wrong-password, user-not-found, invalid-credential, too-many-requests, etc.
+    return 'Email or password is incorrect.';
+  }
+
+  String _mapAuthExceptionToMessage(FirebaseAuthException e) {
+    if (e.code == 'invalid-email') {
+      return 'Invalid email format.';
+    }
+    return 'Email or password is incorrect.';
+  }
+
+  void _showErrorSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   Future<void> _handleLogin() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
+    if (_isLoading) return;
 
+    final email = _emailController.text.trim();
+    final password = _passwordController.text; // no trim for safety
+
+    // -----------------------------
+    // UI-level validation (English)
+    // -----------------------------
     if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter both email and password')),
-      );
+      _showErrorSnack('Please enter both email and password.');
       return;
     }
 
+    if (!_isValidEmail(email)) {
+      _showErrorSnack('Invalid email format.');
+      return;
+    }
+
+    if (password.length < 6) {
+      _showErrorSnack('Password must be at least 6 characters.');
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
 
     try {
@@ -46,13 +97,22 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       if (!mounted) return;
 
       if (success) {
-        context.go('/'); // ✅ 로그인 성공 시 다이어리로 이동
-      } else {
-        final err = ref.read(authStateProvider).error ?? 'Failed to login.';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(err)),
-        );
+        context.go('/');
+        return;
       }
+
+      // If provider returns false without throwing
+      final rawErr = ref.read(authStateProvider).error;
+      final friendly = (rawErr == null || rawErr.trim().isEmpty)
+          ? 'Email or password is incorrect.'
+          : _mapRawErrorToMessage(rawErr);
+
+      _showErrorSnack(friendly);
+    } on FirebaseAuthException catch (e) {
+      _showErrorSnack(_mapAuthExceptionToMessage(e));
+    } catch (_) {
+      // Unknown error -> keep it safe but not too detailed
+      _showErrorSnack('Email or password is incorrect.');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -61,16 +121,28 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
+
+    // Inline error also uses the same mapping
+    final friendlyInlineError = (authState.error == null ||
+            authState.error!.trim().isEmpty)
+        ? null
+        : _mapRawErrorToMessage(authState.error!);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text(
           'Login',
           style: TextStyle(
-            color:
-                Color.fromARGB(255, 255, 255, 255), // Changed title text color
+            color: Colors.white,
           ),
         ),
         centerTitle: true,
@@ -79,157 +151,179 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         elevation: 0,
       ),
       body: GestureDetector(
-        onTap: () => FocusScope.of(context).unfocus(), // ⚡ 화면 탭 시 키보드 내리기
+        onTap: () => FocusScope.of(context).unfocus(),
         child: Stack(
           children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/login_background.jpg',
-              fit: BoxFit.cover,
-              color: const Color.fromARGB(255, 255, 255, 255)
-                  .withOpacity(0.7), // Adjust transparency here
-              colorBlendMode: BlendMode.darken, // Blend mode for transparency
-            ),
-          ),
-          Positioned(
-            top: 0,
-            right: 10,
-            child: Image.asset(
-              'assets/images/star.png',
-            ),
-          ),
-          Center(
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // 앱 로고
-                  SizedBox(
-                    width: 520,
-                    height: 170,
-                    child: Image.asset(
-                      'assets/images/GGUMDREAM_logo_white.png',
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-
-                  // 이메일
-                  SizedBox(
-                    width: 350, // Reduced width
-                    child: TextField(
-                      controller: _emailController,
-                      decoration: InputDecoration(
-                        labelText: 'Email',
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide(
-                            color: const Color.fromARGB(
-                                255, 175, 126, 255), // Change border color
-                            width: 1.5, // Adjust border width
-                          ),
-                        ),
-                        filled: true, // Enable background color
-                        fillColor: Color.fromARGB(255, 255, 255, 255)
-                            .withOpacity(0.3), // Set background color
-                      ),
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // 비밀번호
-                  SizedBox(
-                    width: 350, // Reduced width
-                    child: TextField(
-                      controller: _passwordController,
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        border: const OutlineInputBorder(
-                          borderSide: BorderSide(
-                            color: const Color.fromARGB(
-                                255, 175, 126, 255), // Change border color
-                            width: 1.5, // Adjust border width
-                          ),
-                        ),
-                        filled: true, // Enable background color
-                        fillColor: const Color.fromARGB(255, 255, 255, 255)
-                            .withOpacity(0.3), // Set background color
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _isPasswordVisible
-                                ? Icons.visibility
-                                : Icons.visibility_off,
-                            color: Colors.grey,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _isPasswordVisible = !_isPasswordVisible;
-                            });
-                          },
-                        ),
-                      ),
-                      obscureText: !_isPasswordVisible,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-
-                  if (authState.error != null)
-                    Text(
-                      authState.error!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
-
-                  const SizedBox(height: 16),
-
-                  SizedBox(
-                    width: 350, // Reduced width
-                    child: GestureDetector(
-                      onTap: _isLoading ? null : _handleLogin,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(
-                              sigmaX: 10, sigmaY: 10), // 🔥 유리 흐림 효과
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(14),
-                              color: Colors.white
-                                  .withOpacity(0.25), // 🔥 glass 투명도
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.35),
-                                width: 1.4,
-                              ),
-                            ),
-                            alignment: Alignment.center,
-                            child: _isLoading
-                                ? const CircularProgressIndicator(
-                                    color: Colors.white)
-                                : const Text(
-                                    'Login',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => context.go('/login/signup'),
-                    child: const Text('Sign Up'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color.fromARGB(255, 107, 107, 107),
-                    ),
-                  ),
-                ],
+            Positioned.fill(
+              child: Image.asset(
+                'assets/images/login_background.jpg',
+                fit: BoxFit.cover,
+                color: const Color.fromARGB(255, 255, 255, 255)
+                    .withOpacity(0.7),
+                colorBlendMode: BlendMode.darken,
               ),
             ),
-          ),
-        ],
-      ),
+            Positioned(
+              top: 0,
+              right: 10,
+              child: Image.asset('assets/images/star.png'),
+            ),
+            Center(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Logo
+                    SizedBox(
+                      width: 50,
+                      height: 40,
+                      child: LogoParticleAnimation(
+                        logoAssetPath: 'assets/images/GGUMDREAM_logo_white.png',
+                        offsetX: 0,
+                        offsetY: -10,
+                        width: 50,
+                        height: 40,
+                        logoScale: 8.0,
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+
+                    // Email
+                    SizedBox(
+                      width: 350,
+                      child: TextField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        decoration: InputDecoration(
+                          labelText: 'Email',
+                          border: const OutlineInputBorder(
+                            borderSide: BorderSide(
+                              color: Color.fromARGB(255, 175, 126, 255),
+                              width: 1.5,
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: const Color.fromARGB(255, 255, 255, 255)
+                              .withOpacity(0.3),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Password
+                    SizedBox(
+                      width: 350,
+                      child: TextField(
+                        controller: _passwordController,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _handleLogin(),
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          border: const OutlineInputBorder(
+                            borderSide: BorderSide(
+                              color: Color.fromARGB(255, 175, 126, 255),
+                              width: 1.5,
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: const Color.fromARGB(255, 255, 255, 255)
+                              .withOpacity(0.3),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _isPasswordVisible
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                              color: Colors.grey,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _isPasswordVisible = !_isPasswordVisible;
+                              });
+                            },
+                          ),
+                        ),
+                        obscureText: !_isPasswordVisible,
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+
+                    // Inline error (friendly)
+                    if (friendlyInlineError != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(
+                          friendlyInlineError,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+
+                    const SizedBox(height: 16),
+
+                    // Login button
+                    SizedBox(
+                      width: 350,
+                      child: GestureDetector(
+                        onTap: _isLoading ? null : _handleLogin,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: BackdropFilter(
+                            filter:
+                                ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                color: Colors.white.withOpacity(0.25),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.35),
+                                  width: 1.4,
+                                ),
+                              ),
+                              alignment: Alignment.center,
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.4,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Login',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Sign up
+                    TextButton(
+                      onPressed:
+                          _isLoading ? null : () => context.go('/login/signup'),
+                      style: TextButton.styleFrom(
+                        foregroundColor:
+                            const Color.fromARGB(255, 107, 107, 107),
+                      ),
+                      child: const Text('Sign Up'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

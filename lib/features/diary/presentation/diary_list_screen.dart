@@ -1,3 +1,8 @@
+// lib/features/diary/presentation/diary_list_screen.dart
+
+import 'dart:ui';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -14,13 +19,11 @@ import '../application/user_provider.dart';
 import '../domain/diary_entry.dart';
 import 'diary_detail_screen.dart';
 import 'diary_editor_screen.dart';
-import 'dream_sketch_screen.dart'; // ✨ 추가된 파일 import
 
-import 'dart:ui';
-
-// ⚡ 뷰 모드 enum 추가
+/// 뷰 모드
 enum ViewMode { calendar, list, grid }
 
+/// 공통 글라스 카드 위젯
 Widget glassCard({
   required Widget child,
   double radius = 16,
@@ -59,18 +62,69 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
 
   final int _maxActiveListings = 3;
 
+  // ✅ Stats / Editor와 동일 기준으로 dream-day cutoff 통일
+  static const int _cutoffHour = 18;
+
+  // ------------------------
+  // ✅ 날짜 유틸
+  // ------------------------
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  /// ✅ 캘린더/마커/필터의 "단일 진실 기준"
+  /// - 1순위: sleepEndAt(기상일)
+  /// - 2순위: dream logicalDay(cutoff=18)
+  DateTime _calendarDayKey(DiaryEntry e) {
+    if (e.sleepEndAt != null) {
+      return _dateOnly(e.sleepEndAt!);
+    }
+    return _dateOnly(e.logicalDay(cutoffHour: _cutoffHour));
+  }
+
+  // ------------------------
+  // ✅ Sleep 표시 헬퍼
+  // ------------------------
+  String _sleepText(DiaryEntry e) {
+    if (e.sleepDuration < 0) return "Sleep: unknown";
+
+    if (e.sleepStartAt != null && e.sleepEndAt != null) {
+      final f = DateFormat('HH:mm');
+      return "Sleep: ${e.sleepDuration.toStringAsFixed(1)} h "
+          "(${f.format(e.sleepStartAt!)}-${f.format(e.sleepEndAt!)})";
+    }
+
+    return "Sleep: ${e.sleepDuration.toStringAsFixed(1)} h";
+  }
+
+  /// ✅ 카드 날짜 표시 기준
+  /// - 캘린더 모드에서는 "캘린더 마커 기준과 동일"
+  /// - 리스트/그리드는 기존 date 유지
+  DateTime _displayDateForCard(DiaryEntry e) {
+    if (_viewMode == ViewMode.calendar) {
+      return _calendarDayKey(e);
+    }
+    return e.date;
+  }
+
   @override
   Widget build(BuildContext context) {
     final diaryList = ref.watch(diaryListProvider);
-    final displayList = (_viewMode == ViewMode.calendar && _selectedDay != null)
-        ? diaryList
-            .where((entry) => isSameDay(entry.date, _selectedDay))
-            .toList()
-        : diaryList;
+
+    // ✅ 캘린더 모드 + 날짜 선택 시:
+    // "sleepEndAt 우선" 캘린더 기준으로 필터링
+    final displayList =
+        (_viewMode == ViewMode.calendar && _selectedDay != null)
+            ? diaryList
+                .where((entry) => isSameDay(
+                      _calendarDayKey(entry),
+                      _selectedDay,
+                    ))
+                .toList()
+            : diaryList;
 
     return Scaffold(
       body: Stack(
         children: [
+          // 배경 그라디언트
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -88,6 +142,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
               ),
             ),
           ),
+          // 배경 이미지 오버레이
           Positioned.fill(
             child: Opacity(
               opacity: 0.4,
@@ -100,6 +155,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
           SafeArea(
             child: CustomScrollView(
               slivers: [
+                // 상단 타이틀 & 모드 토글 & 음악 버튼
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
@@ -117,6 +173,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                           ),
                           onPressed: () {
                             setState(() {
+                              // Calendar → List → Grid → Calendar 순환
                               if (_viewMode == ViewMode.calendar) {
                                 _viewMode = ViewMode.list;
                                 _selectedDay = null;
@@ -131,10 +188,18 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                         const Text(
                           "My GGUM DREAM",
                           style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Stencil',
-                              color: Color.fromARGB(255, 255, 255, 255)),
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Stencil',
+                            color: Color.fromARGB(255, 255, 255, 255),
+                            shadows: [
+                              Shadow(
+                                offset: Offset(1, 1),
+                                blurRadius: 2,
+                                color: Color.fromARGB(98, 216, 216, 216),
+                              ),
+                            ],
+                          ),
                         ),
                         IconButton(
                           icon: Image.asset(
@@ -147,8 +212,8 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (context) =>
-                                      const SleepModeScreen()),
+                                builder: (context) => const SleepModeScreen(),
+                              ),
                             );
                           },
                         ),
@@ -156,6 +221,8 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                     ),
                   ),
                 ),
+
+                // 캘린더 뷰
                 if (_viewMode == ViewMode.calendar)
                   SliverToBoxAdapter(
                     child: Center(
@@ -166,18 +233,27 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                           width: MediaQuery.of(context).size.width * 0.86,
                           margin: const EdgeInsets.only(top: 10, bottom: 10),
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 6),
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
                           child: TableCalendar(
                             firstDay: DateTime.utc(2020, 1, 1),
                             lastDay: DateTime.utc(2030, 12, 31),
                             focusedDay: _focusedDay,
                             selectedDayPredicate: (day) =>
                                 isSameDay(_selectedDay, day),
+
+                            // ✅ 이벤트 로더:
+                            // "sleepEndAt 우선" 캘린더 기준으로 이벤트 매칭
                             eventLoader: (day) {
                               return diaryList
-                                  .where((entry) => isSameDay(entry.date, day))
+                                  .where((entry) => isSameDay(
+                                        _calendarDayKey(entry),
+                                        day,
+                                      ))
                                   .toList();
                             },
+
                             onDaySelected: (selectedDay, focusedDay) {
                               setState(() {
                                 if (_selectedDay != null &&
@@ -189,12 +265,14 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                                 _focusedDay = focusedDay;
                               });
                             },
+
                             onPageChanged: (focusedDay) {
                               if (focusedDay.year < 2023) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content:
-                                        Text('Cannot go further back in time.'),
+                                    content: Text(
+                                      'Cannot go further back in time.',
+                                    ),
                                     duration: Duration(seconds: 3),
                                   ),
                                 );
@@ -212,6 +290,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                                 });
                               }
                             },
+
                             headerStyle: const HeaderStyle(
                               formatButtonVisible: false,
                               titleCentered: true,
@@ -223,6 +302,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                               leftChevronPadding: EdgeInsets.zero,
                               rightChevronPadding: EdgeInsets.zero,
                             ),
+
                             calendarStyle: const CalendarStyle(
                               cellMargin: EdgeInsets.all(0),
                               cellPadding: EdgeInsets.all(2),
@@ -235,16 +315,23 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                                 shape: BoxShape.circle,
                               ),
                             ),
+
                             daysOfWeekStyle: const DaysOfWeekStyle(
                               weekdayStyle: TextStyle(fontSize: 11),
                               weekendStyle: TextStyle(fontSize: 11),
                             ),
+
                             calendarBuilders: CalendarBuilders(
                               markerBuilder: (context, date, events) {
                                 if (events.isEmpty) return null;
-                                final diaryEntries = events.cast<DiaryEntry>();
+
+                                final diaryEntries =
+                                    events.whereType<DiaryEntry>().toList();
+                                if (diaryEntries.isEmpty) return null;
+
                                 final moods =
                                     diaryEntries.map((e) => e.mood).toList();
+
                                 final displayMoods = moods.take(2).toList();
                                 final hasMore = moods.length > 2;
 
@@ -253,17 +340,20 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      ...displayMoods.map((mood) => Text(
-                                            mood,
-                                            style:
-                                                const TextStyle(fontSize: 10),
-                                          )),
+                                      ...displayMoods.map(
+                                        (mood) => Text(
+                                          mood,
+                                          style:
+                                              const TextStyle(fontSize: 10),
+                                        ),
+                                      ),
                                       if (hasMore)
                                         const Text(
                                           '+',
                                           style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                     ],
                                   ),
@@ -275,114 +365,85 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                       ),
                     ),
                   ),
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 10),
-                ),
-                displayList.isEmpty
-                    ? SliverFillRemaining(
-                        child: Center(
-                          child: Text(
-                            _viewMode == ViewMode.calendar &&
-                                    _selectedDay != null
-                                ? "No dreams on this day.\nTap + to write!"
-                                : "Let's make your\nfirst post",
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                                fontSize: 16, color: Colors.black54),
-                          ),
+
+                const SliverToBoxAdapter(child: SizedBox(height: 10)),
+
+                // 리스트 / 그리드 / 비어있을 때
+                if (displayList.isEmpty)
+                  SliverFillRemaining(
+                    child: Center(
+                      child: Text(
+                        _viewMode == ViewMode.calendar &&
+                                _selectedDay != null
+                            ? "No dreams on this day.\nTap + to write!"
+                            : "Let's make your\nfirst post",
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.black54,
                         ),
-                      )
-                    : _viewMode == ViewMode.grid
-                        ? SliverPadding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            sliver: SliverGrid(
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
-                                crossAxisSpacing: 4,
-                                mainAxisSpacing: 4,
-                                childAspectRatio: 1,
-                              ),
-                              delegate: SliverChildBuilderDelegate(
-                                (context, index) {
-                                  return _buildGridItem(
-                                      context, displayList[index]);
-                                },
-                                childCount: displayList.length,
+                      ),
+                    ),
+                  )
+                else if (_viewMode == ViewMode.grid)
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    sliver: SliverGrid(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 4,
+                        mainAxisSpacing: 4,
+                        childAspectRatio: 1,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          return _buildGridItem(context, displayList[index]);
+                        },
+                        childCount: displayList.length,
+                      ),
+                    ),
+                  )
+                else
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        return Column(
+                          children: [
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              child: _buildDiaryCard(
+                                context,
+                                ref,
+                                displayList[index],
                               ),
                             ),
-                          )
-                        : SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) {
-                                return Column(
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 20),
-                                      child: _buildDiaryCard(
-                                          context, ref, displayList[index]),
-                                    ),
-                                    const SizedBox(height: 10),
-                                  ],
-                                );
-                              },
-                              childCount: displayList.length,
-                            ),
-                          ),
+                            const SizedBox(height: 10),
+                          ],
+                        );
+                      },
+                      childCount: displayList.length,
+                    ),
+                  ),
+
                 const SliverToBoxAdapter(child: SizedBox(height: 80)),
               ],
             ),
           ),
         ],
       ),
+
+      // FABs
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          // ✨ [추가된 부분] 그리기 버튼
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const DreamSketchScreen(),
-                ),
-              );
-            },
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(50),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                child: Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF6C63FF).withOpacity(0.8), // 보라색 계열
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.4),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.brush,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
           // 통계 버튼
           GestureDetector(
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const StatsScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const StatsScreen()),
               );
             },
             child: ClipRRect(
@@ -410,6 +471,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             ),
           ),
           const SizedBox(height: 16),
+
           // 작성 버튼
           GestureDetector(
             onTap: () {
@@ -451,12 +513,15 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     );
   }
 
-  // ... (기존 _buildDiaryCard, _buildDraftCard, _buildGridItem 등 나머지 메서드는 그대로 유지됨)
-  // NOTE: 파일 길이상 생략되었지만, 실제 파일에는 아래 메서드들이 모두 포함되어야 합니다.
-  // 기존 코드의 나머지 부분을 그대로 두시면 됩니다.
+  // ------------------------
+  // 카드 / 그리드 아이템들
+  // ------------------------
 
   Widget _buildDiaryCard(
-      BuildContext context, WidgetRef ref, DiaryEntry entry) {
+    BuildContext context,
+    WidgetRef ref,
+    DiaryEntry entry,
+  ) {
     if (entry.isDraft) {
       return _buildDraftCard(context, ref, entry);
     }
@@ -470,19 +535,23 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             item.diaryId == entry.id &&
             item.ownerName == ref.read(userProvider).username,
       );
-    } catch (e) {
+    } catch (_) {
       matchingShopItem = null;
     }
 
     final bool isSoldOut = matchingShopItem != null && matchingShopItem.isSold;
     final bool isListed = matchingShopItem != null;
 
+    final displayDate = _displayDateForCard(entry);
+    final dateText = DateFormat('yyyy.MM.dd').format(displayDate);
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-              builder: (context) => DiaryDetailScreen(entry: entry)),
+            builder: (context) => DiaryDetailScreen(entry: entry),
+          ),
         );
       },
       child: Center(
@@ -496,17 +565,36 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 상단 날짜 + 이모지 + 삭제 버튼
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      "${DateFormat('yyyy.MM.dd').format(entry.date)}  ${entry.mood}",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "$dateText  ${entry.mood}",
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _sleepText(entry),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     InkWell(
                       onTap: () => _confirmDelete(context, ref, entry.id),
-                      child: const Icon(Icons.delete_outline,
-                          size: 20, color: Color.fromARGB(255, 70, 70, 70)),
+                      child: const Icon(
+                        Icons.delete_outline,
+                        size: 20,
+                        color: Color.fromARGB(255, 70, 70, 70),
+                      ),
                     ),
                   ],
                 ),
@@ -514,6 +602,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // 썸네일
                     Container(
                       width: 72,
                       height: 72,
@@ -524,12 +613,15 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                       child: entry.imageUrl != null
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(12),
-                              child: Image.network(entry.imageUrl!,
-                                  fit: BoxFit.cover),
+                              child: Image.network(
+                                entry.imageUrl!,
+                                fit: BoxFit.cover,
+                              ),
                             )
                           : const Icon(Icons.image, color: Colors.grey),
                     ),
                     const SizedBox(width: 10),
+                    // 내용 + 판매 버튼
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -545,7 +637,11 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                             alignment: Alignment.centerRight,
                             child: InkWell(
                               onTap: () => _handleSellButtonTap(
-                                  context, ref, entry, isSoldOut),
+                                context,
+                                ref,
+                                entry,
+                                isSoldOut,
+                              ),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 12,
@@ -588,14 +684,20 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
   }
 
   Widget _buildDraftCard(
-      BuildContext context, WidgetRef ref, DiaryEntry entry) {
+    BuildContext context,
+    WidgetRef ref,
+    DiaryEntry entry,
+  ) {
+    final displayDate = _displayDateForCard(entry);
+    final dateText = DateFormat('yyyy.MM.dd').format(displayDate);
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => DiaryEditorScreen(
-              selectedDate: entry.date,
+              selectedDate: entry.logicalDay(cutoffHour: _cutoffHour),
               existingEntry: entry,
             ),
           ),
@@ -612,19 +714,22 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 상단 날짜 + DRAFT + 삭제
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
                       children: [
                         Text(
-                          "${DateFormat('yyyy.MM.dd').format(entry.date)}  ${entry.mood}",
+                          "$dateText  ${entry.mood}",
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.orange,
                             borderRadius: BorderRadius.circular(4),
@@ -653,15 +758,19 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                       : entry.content,
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: Colors.black87),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.black87,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 const Text(
                   "Tap to complete and analyze",
                   style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.orange,
-                      fontStyle: FontStyle.italic),
+                    fontSize: 11,
+                    color: Colors.orange,
+                    fontStyle: FontStyle.italic,
+                  ),
                 ),
               ],
             ),
@@ -671,6 +780,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     );
   }
 
+  /// Instagram 피드 스타일 Grid Item
   Widget _buildGridItem(BuildContext context, DiaryEntry entry) {
     return GestureDetector(
       onTap: () {
@@ -698,7 +808,10 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                   errorBuilder: (context, error, stackTrace) {
                     return Container(
                       color: Colors.grey[300],
-                      child: const Icon(Icons.broken_image, color: Colors.grey),
+                      child: const Icon(
+                        Icons.broken_image,
+                        color: Colors.grey,
+                      ),
                     );
                   },
                 ),
@@ -707,6 +820,8 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
               const Center(
                 child: Icon(Icons.image, color: Colors.grey, size: 40),
               ),
+
+            // Draft 뱃지
             if (entry.isDraft)
               Positioned(
                 top: 4,
@@ -728,6 +843,8 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                   ),
                 ),
               ),
+
+            // Mood 이모지
             Positioned(
               bottom: 4,
               left: 4,
@@ -749,12 +866,21 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     );
   }
 
-  void _handleSellButtonTap(BuildContext context, WidgetRef ref,
-      DiaryEntry entry, bool isSoldOut) async {
+  // ------------------------
+  // 판매 관련 로직
+  // ------------------------
+
+  void _handleSellButtonTap(
+    BuildContext context,
+    WidgetRef ref,
+    DiaryEntry entry,
+    bool isSoldOut,
+  ) async {
     if (isSoldOut) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text("This item is already sold and cannot be modified.")),
+          content: Text("This item is already sold and cannot be modified."),
+        ),
       );
       return;
     }
@@ -767,7 +893,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             item.diaryId == entry.id &&
             item.ownerName == ref.read(userProvider).username,
       );
-    } catch (e) {
+    } catch (_) {
       matchingShopItem = null;
     }
 
@@ -776,20 +902,25 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     } else {
       final myActiveItems = ref
           .read(shopProvider)
-          .where((item) =>
-              item.ownerName == ref.read(userProvider).username && !item.isSold)
+          .where(
+            (item) =>
+                item.ownerName == ref.read(userProvider).username &&
+                !item.isSold,
+          )
           .length;
 
       if (myActiveItems >= _maxActiveListings) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(
-                  "Limit Reached! You can only have $_maxActiveListings active listings.")),
+            content: Text(
+              "Limit Reached! You can only have $_maxActiveListings active listings.",
+            ),
+          ),
         );
         return;
       }
 
-      int? price = await _showPriceInputDialog(context);
+      final price = await _showPriceInputDialog(context);
       if (!context.mounted) return;
       if (price != null) {
         _registerToShop(context, ref, entry, price);
@@ -827,7 +958,8 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                                 ? const Color(0xFFAABCC5)
                                 : Colors.grey[200],
                             borderRadius: const BorderRadius.horizontal(
-                                left: Radius.circular(8)),
+                              left: Radius.circular(8),
+                            ),
                           ),
                           alignment: Alignment.center,
                           child: Text(
@@ -854,7 +986,8 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                                 ? const Color(0xFFAABCC5)
                                 : Colors.grey[200],
                             borderRadius: const BorderRadius.horizontal(
-                                right: Radius.circular(8)),
+                              right: Radius.circular(8),
+                            ),
                           ),
                           alignment: Alignment.center,
                           child: Text(
@@ -874,7 +1007,9 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                   const Text(
                     "Listed for 0 coins.",
                     style: TextStyle(
-                        color: Colors.grey, fontStyle: FontStyle.italic),
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
+                    ),
                   )
                 else
                   TextField(
@@ -887,10 +1022,14 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                       errorText: errorText,
                       border: const OutlineInputBorder(),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 12),
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
                     ),
-                    onChanged: (value) {
-                      if (errorText != null) setState(() => errorText = null);
+                    onChanged: (_) {
+                      if (errorText != null) {
+                        setState(() => errorText = null);
+                      }
                     },
                   ),
               ],
@@ -930,7 +1069,11 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     );
   }
 
-  void _showEditOptions(BuildContext context, WidgetRef ref, DiaryEntry entry) {
+  void _showEditOptions(
+    BuildContext context,
+    WidgetRef ref,
+    DiaryEntry entry,
+  ) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -940,7 +1083,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
-              int? newPrice = await _showPriceInputDialog(context);
+              final newPrice = await _showPriceInputDialog(context);
               if (!context.mounted) return;
               if (newPrice != null) {
                 try {
@@ -958,7 +1101,8 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                       .updateSalePrice(entry.id, newPrice);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                        content: Text("Price updated to $newPrice coins!")),
+                      content: Text("Price updated to $newPrice coins!"),
+                    ),
                   );
                 } catch (e) {
                   debugPrint("Error: $e");
@@ -972,8 +1116,10 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
               Navigator.pop(dialogContext);
               _cancelSale(context, ref, entry);
             },
-            child:
-                const Text("Stop Selling", style: TextStyle(color: Colors.red)),
+            child: const Text(
+              "Stop Selling",
+              style: TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -981,7 +1127,11 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
   }
 
   void _registerToShop(
-      BuildContext context, WidgetRef ref, DiaryEntry entry, int price) async {
+    BuildContext context,
+    WidgetRef ref,
+    DiaryEntry entry,
+    int price,
+  ) async {
     try {
       final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
       if (currentUser == null) {
@@ -1020,14 +1170,23 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     );
   }
 
-  void _confirmDelete(BuildContext context, WidgetRef ref, String entryId) {
+  // ------------------------
+  // 삭제 / Coming Soon 다이얼로그
+  // ------------------------
+
+  void _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    String entryId,
+  ) {
     showDialog(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
           title: const Text("Delete Diary"),
-          content:
-              const Text("Are you sure you want to delete this diary entry?"),
+          content: const Text(
+            "Are you sure you want to delete this diary entry?",
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
@@ -1041,7 +1200,10 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                   const SnackBar(content: Text("Diary deleted.")),
                 );
               },
-              child: const Text("Delete", style: TextStyle(color: Colors.red)),
+              child: const Text(
+                "Delete",
+                style: TextStyle(color: Colors.red),
+              ),
             ),
           ],
         );

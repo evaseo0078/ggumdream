@@ -9,6 +9,7 @@ import '../application/shop_provider.dart';
 import '../application/user_provider.dart';
 import '../data/purchase_repository.dart';
 import 'package:ggumdream/shared/widgets/wobbly_painter.dart';
+import 'package:ggumdream/shared/widgets/glass_card.dart';
 
 class ShopDetailScreen extends ConsumerWidget {
   final ShopItem item;
@@ -27,8 +28,8 @@ class ShopDetailScreen extends ConsumerWidget {
     if (item.isSold && !isPurchasedByMe) {
       return Scaffold(
         appBar: AppBar(
-          leading: const BackButton(color: Colors.black),
-          title: const Text('Access Denied', style: TextStyle(color: Colors.black)),
+          leading: const BackButton(color: Color.fromARGB(255, 255, 255, 255)),
+          title: const Text('Access Denied', style: TextStyle(color: Color.fromARGB(255, 255, 255, 255))),
         ),
         body: const Center(
           child: Column(
@@ -53,19 +54,21 @@ class ShopDetailScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: const Color.fromARGB(255, 230, 220, 255),
       appBar: AppBar(
-        leading: const BackButton(color: Colors.black),
+        backgroundColor: const Color.fromARGB(255, 192, 171, 255),
+        leading: const BackButton(color: Color.fromARGB(255, 255, 255, 255)),
         title: Text(
           "$dateText (by ${item.ownerName})",
           style: const TextStyle(
-            color: Colors.black,
+            color: Color.fromARGB(255, 255, 255, 255),
             fontSize: 16,
             fontWeight: FontWeight.bold,
             fontFamily: 'Stencil',
           ),
         ),
       ),
+      
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -190,10 +193,9 @@ class ShopDetailScreen extends ConsumerWidget {
                 child: SizedBox(
                   width: 200,
                   height: 50,
-                  child: WobblyContainer(
-                    backgroundColor: const Color(0xFFAABCC5),
-                    borderColor: Colors.black,
-                    borderRadius: 25,
+                  child: GlassCard(
+                    radius: 25,
+                    opacity: 0.5,
                     child: ElevatedButton(
                       onPressed: () {
                         _confirmPurchase(context, ref);
@@ -211,6 +213,7 @@ class ShopDetailScreen extends ConsumerWidget {
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
+                          color: Color.fromARGB(255, 0, 0, 0),
                         ),
                       ),
                     ),
@@ -282,7 +285,7 @@ class ShopDetailScreen extends ConsumerWidget {
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
               child: const Text("No"),
-            ),
+            ), 
             TextButton(
               onPressed: () async {
                 Navigator.pop(dialogContext);

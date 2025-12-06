@@ -61,6 +61,9 @@ dependencies:
   #--------------AI 관련 패키지--------------
   google_generative_ai: ^0.4.7 # Gemini API 호출용
   flutter_dotenv: ^5.1.0 # API 키 보안 관리
+  image_picker: ^1.0.7 # 이미지 선택
+  google_mlkit_text_recognition: ^0.13.1 # Google ML Kit OCR
+  flutter_image_compress: ^2.4.0
   #-----------------------------------------
   signature: ^5.4.1 # 드림 스케치 캔버스(한서)
 
