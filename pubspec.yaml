@@ -62,6 +62,7 @@ dependencies:
   google_generative_ai: ^0.4.7 # Gemini API 호출용
   flutter_dotenv: ^5.1.0 # API 키 보안 관리
   #-----------------------------------------
+  signature: ^5.4.1 # 드림 스케치 캔버스(한서)
 
 dev_dependencies:
   flutter_test:

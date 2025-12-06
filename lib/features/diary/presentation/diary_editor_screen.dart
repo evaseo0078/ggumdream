@@ -7,18 +7,20 @@ import '../application/diary_providers.dart';
 import '../application/user_provider.dart';
 import '../domain/diary_entry.dart';
 import 'diary_detail_screen.dart';
-import 'package:ggumdream/shared/widgets/wobbly_painter.dart'; // FIX: 패키지 경로로 변경
+import 'package:ggumdream/shared/widgets/wobbly_painter.dart';
 import 'dart:ui';
 
 class DiaryEditorScreen extends ConsumerStatefulWidget {
   final DateTime selectedDate;
-  // ⚡ [추가됨] 수정할 기존 일기 (없으면 새 작성)
   final DiaryEntry? existingEntry;
+  // ✨ AI 해석 텍스트를 초기값으로 받기 위함
+  final String? initialContent;
 
   const DiaryEditorScreen({
     super.key,
     required this.selectedDate,
-    this.existingEntry, // 선택적 파라미터
+    this.existingEntry,
+    this.initialContent,
   });
 
   @override
@@ -26,14 +28,14 @@ class DiaryEditorScreen extends ConsumerStatefulWidget {
 }
 
 class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
-  late TextEditingController _textController; // late로 변경
+  late TextEditingController _textController;
   double _sleepDuration = 7.0;
   bool _isSleepUnknown = false;
 
   @override
   void initState() {
     super.initState();
-    // ⚡ [로직 추가] 기존 일기가 있으면 내용 채워넣기 (수정 모드)
+    // ⚡ 초기화 로직: 기존 일기 > AI 해석 > 빈 값 순서
     if (widget.existingEntry != null) {
       _textController =
           TextEditingController(text: widget.existingEntry!.content);
@@ -42,6 +44,8 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
       } else {
         _sleepDuration = widget.existingEntry!.sleepDuration;
       }
+    } else if (widget.initialContent != null) {
+      _textController = TextEditingController(text: widget.initialContent);
     } else {
       _textController = TextEditingController();
     }
@@ -126,7 +130,6 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     try {
       final llmService = ref.read(llmServiceProvider);
 
-      // ✨ 항상 AI를 다시 돌립니다 (새 이미지, 새 요약 생성)
       final results = await Future.wait([
         llmService.generateImage(text),
         llmService.analyzeDream(text),
@@ -136,14 +139,10 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
       final analysis = results[1] as Map<String, String>;
 
       final finalSleepDuration = _isSleepUnknown ? -1.0 : _sleepDuration;
-
-      // ⚡ [핵심 로직] 수정 모드 vs 새 작성 모드 구분
       final bool isEditMode = widget.existingEntry != null;
 
       final newEntry = DiaryEntry(
-        // 수정이면 기존 ID 유지, 새 글이면 새 ID 생성
         id: isEditMode ? widget.existingEntry!.id : const Uuid().v4(),
-        // 수정이면 기존 날짜 유지, 새 글이면 선택 날짜
         date: isEditMode ? widget.existingEntry!.date : widget.selectedDate,
         content: text,
         imageUrl: imageUrl,
@@ -151,20 +150,18 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
         interpretation: analysis['interpretation'],
         mood: analysis['mood'] ?? "🌿",
         sleepDuration: finalSleepDuration,
-        isSold: isEditMode ? widget.existingEntry!.isSold : false, // 판매 상태 유지
+        isSold: isEditMode ? widget.existingEntry!.isSold : false,
       );
 
-      // 저장 (Update or Add)
       if (isEditMode) {
         ref.read(diaryListProvider.notifier).updateDiary(newEntry);
       } else {
         ref.read(diaryListProvider.notifier).addDiary(newEntry);
-        // ⚡ [중요] 코인 보상은 '새 글'일 때만 지급 (수정 남발 방지)
         ref.read(userProvider.notifier).earnCoins(10);
       }
 
       if (!mounted) return;
-      Navigator.pop(context); // 로딩 닫기
+      Navigator.pop(context);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -172,7 +169,6 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                 isEditMode ? "Diary Updated!" : "Diary Posted! +10 coins")),
       );
 
-      // 상세 화면으로 이동 (새 데이터로 교체)
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -189,7 +185,6 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 날짜 표시 (수정 모드면 기존 날짜)
     final displayDate = widget.existingEntry?.date ?? widget.selectedDate;
     final dateStr = DateFormat('yyyy/MM/dd (E)').format(displayDate);
 
@@ -213,9 +208,9 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Color(0xFFE6E6FA), // Light purple
+                Color(0xFFE6E6FA),
                 Color.fromARGB(255, 168, 152, 255),
-                Color.fromARGB(255, 152, 176, 255) // Dark purple
+                Color.fromARGB(255, 152, 176, 255)
               ],
             ),
           ),
@@ -230,24 +225,17 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                         fontWeight: FontWeight.bold,
                         color: Color.fromARGB(255, 129, 129, 129))),
                 const SizedBox(height: 10),
-
-                // 수면 시간 입력 박스 (WobblyContainer 적용)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(
-                        sigmaX: 14, sigmaY: 14), // 🔥 blur 강하게 적용
+                    filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                     child: WobblyContainer(
-                      backgroundColor:
-                          Colors.white.withOpacity(0.15), // 🔥 Glass 배경
-                      borderColor:
-                          Colors.white.withOpacity(0.45), // 🔥 Glass 테두리
+                      backgroundColor: Colors.white.withOpacity(0.15),
+                      borderColor: Colors.white.withOpacity(0.45),
                       borderRadius: 20,
                       padding: EdgeInsets.zero,
-
                       child: Column(
                         children: [
-                          // --- 탭 버튼 영역 ---
                           Row(
                             children: [
                               Expanded(
@@ -261,7 +249,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                                       color: !_isSleepUnknown
                                           ? const Color.fromARGB(
                                                   255, 190, 150, 255)
-                                              .withOpacity(0.2) // 선택된 탭 더 밝게
+                                              .withOpacity(0.2)
                                           : const Color.fromARGB(
                                               0, 176, 149, 255),
                                       borderRadius: const BorderRadius.only(
@@ -317,11 +305,8 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                               ),
                             ],
                           ),
-
                           const Divider(
                               height: 1, thickness: 1, color: Colors.white30),
-
-                          // --- 입력 값 및 슬라이더 표시 ---
                           Padding(
                             padding: const EdgeInsets.all(16.0),
                             child: _isSleepUnknown
@@ -371,9 +356,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 30),
-
                 const Text("Write your dream (min 20 chars)",
                     style: TextStyle(
                         fontSize: 18,
@@ -384,16 +367,12 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: BackdropFilter(
-                      filter:
-                          ImageFilter.blur(sigmaX: 12, sigmaY: 12), // 🔥 blur
+                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                       child: WobblyContainer(
-                        backgroundColor:
-                            Colors.white.withOpacity(0.3), // 🔥 Glass 투명 배경
-                        borderColor:
-                            Colors.white.withOpacity(0.5), // 🔥 은은한 흰 테두리
+                        backgroundColor: Colors.white.withOpacity(0.3),
+                        borderColor: Colors.white.withOpacity(0.5),
                         borderRadius: 20,
                         padding: const EdgeInsets.all(16),
-
                         child: TextField(
                           controller: _textController,
                           maxLines: null,
@@ -401,15 +380,14 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                           style: const TextStyle(
                             fontSize: 16,
                             height: 1.5,
-                            color: Color.fromARGB(
-                                255, 46, 46, 46), // 🔥 유리 스타일에서는 흰 글씨가 예쁨
+                            color: Color.fromARGB(255, 46, 46, 46),
                           ),
                           decoration: const InputDecoration(
                             border: InputBorder.none,
                             hintText: "Describe what happened in your dream...",
                             hintStyle: TextStyle(
                               color: Colors.white70,
-                              fontStyle: FontStyle.italic, // 🔥 hint도 어울리게 변경
+                              fontStyle: FontStyle.italic,
                             ),
                           ),
                           onTapOutside: (_) => FocusScope.of(context).unfocus(),
@@ -418,7 +396,6 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
