@@ -405,6 +405,10 @@ class AccountScreen extends ConsumerWidget {
                       context.go('/login');
                     }
                   },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color.fromARGB(255, 192, 171, 255), // 연보라색
+                    foregroundColor: Colors.white, // 흰색 텍스트
+                  ),
                   child: const Text('Logout'),
                 ),
               ),
