@@ -161,61 +161,68 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
   }
 
   bool _intervalOverlap(
-    DateTime aStart,
-    DateTime aEnd,
-    DateTime bStart,
-    DateTime bEnd,
-  ) {
-    return aStart.isBefore(bEnd) && bStart.isBefore(aEnd);
-  }
+  DateTime aStart,
+  DateTime aEnd,
+  DateTime bStart,
+  DateTime bEnd,
+) {
+  // 두 구간이 겹치지 않는 경우
+  final noOverlap =
+      aStart.isAtSameMomentAs(bEnd) || aStart.isAfter(bEnd) ||
+      bStart.isAtSameMomentAs(aEnd) || bStart.isAfter(aEnd);
+
+  return !noOverlap;
+}
+
 
   /// ✅ POST 버튼에서만 적용되는 검증
   String? _validateSleepOnPost({
-    required DiaryEntry candidate,
-    required List<DiaryEntry> all,
-  }) {
-    if (candidate.sleepDuration < 0) return null;
+  required DiaryEntry candidate,
+  required List<DiaryEntry> all,
+}) {
+  if (candidate.sleepDuration < 0) return null;
 
-    final baseDate = candidate.date;
-    final sameDayEntries = _entriesOfSameDreamDay(baseDate, all)
-        .where((e) => e.id != candidate.id)
-        .toList();
+  final baseDate = candidate.date;
+  final sameDayEntries = _entriesOfSameDreamDay(baseDate, all)
+      .where((e) => e.id != candidate.id)
+      .toList();
 
-    // 1) 총합 24h 검사
-    double existingTotal = 0.0;
-    for (final e in sameDayEntries) {
-      if (e.sleepDuration > 0) {
-        existingTotal += e.sleepDuration;
-      }
+  // 1) 총합 24h 검사
+  double existingTotal = 0.0;
+  for (final e in sameDayEntries) {
+    if (e.sleepDuration > 0) {
+      existingTotal += e.sleepDuration;
     }
-
-    final newTotal = existingTotal + candidate.sleepDuration;
-    if (newTotal > 24.0 + 1e-6) {
-      final remain = (24.0 - existingTotal).clamp(0.0, 24.0);
-      return "수면 시간이 24시간을 초과했어요.\n"
-          "오늘 남은 수면 가능 시간: ${remain.toStringAsFixed(1)}h\n"
-          "시간을 다시 수정해 주세요.";
-    }
-
-    // 2) 구간 겹침 검사
-    if (candidate.sleepStartAt != null && candidate.sleepEndAt != null) {
-      for (final e in sameDayEntries) {
-        if (e.sleepStartAt == null || e.sleepEndAt == null) continue;
-
-        if (_intervalOverlap(
-          candidate.sleepStartAt!,
-          candidate.sleepEndAt!,
-          e.sleepStartAt!,
-          e.sleepEndAt!,
-        )) {
-          return "이미 기록된 수면 구간과 겹쳐요.\n"
-              "시간을 다시 수정해 주세요.";
-        }
-      }
-    }
-
-    return null;
   }
+
+  final newTotal = existingTotal + candidate.sleepDuration;
+  if (newTotal > 24.0 + 1e-6) {
+    final remain = (24.0 - existingTotal).clamp(0.0, 24.0);
+    return "수면 시간이 24시간을 초과했어요.\n"
+        "오늘 남은 수면 가능 시간: ${remain.toStringAsFixed(1)}h\n"
+        "시간을 다시 수정해 주세요.";
+  }
+
+  // 2) 구간 겹침 검사 (완전히 동일한 시간도 겹침 처리됨)
+  if (candidate.sleepStartAt != null && candidate.sleepEndAt != null) {
+    for (final e in sameDayEntries) {
+      if (e.sleepStartAt == null || e.sleepEndAt == null) continue;
+
+      if (_intervalOverlap(
+        candidate.sleepStartAt!,
+        candidate.sleepEndAt!,
+        e.sleepStartAt!,
+        e.sleepEndAt!,
+      )) {
+        return "이미 기록된 수면 구간과 겹쳐요.\n"
+            "시간을 다시 수정해 주세요.";
+      }
+    }
+  }
+
+  return null;
+}
+
 
   // ───────────────── 저장 로직 ─────────────────
 
