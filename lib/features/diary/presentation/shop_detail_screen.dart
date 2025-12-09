@@ -1,3 +1,4 @@
+//shop_detail_screen.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,11 +6,12 @@ import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:cloud_functions/cloud_functions.dart';
-import '../../../home/home_shell.dart';
+
+import '../../../home/home_shell.dart'; // (사용 안 하면 제거 가능)
 import '../../shop/domain/shop_item.dart';
 import '../application/shop_provider.dart';
 import '../application/user_provider.dart';
-import '../data/purchase_repository.dart';
+import '../data/purchase_repository.dart'; // (사용 안 하면 제거 가능)
 import 'package:ggumdream/shared/widgets/wobbly_painter.dart';
 import 'package:ggumdream/shared/widgets/glass_card.dart';
 
@@ -17,7 +19,11 @@ class ShopDetailScreen extends ConsumerWidget {
   final ShopItem item;
   final bool isPurchased;
 
-  const ShopDetailScreen({super.key, required this.item, this.isPurchased = false});
+  const ShopDetailScreen({
+    super.key,
+    required this.item,
+    this.isPurchased = false,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -26,12 +32,24 @@ class ShopDetailScreen extends ConsumerWidget {
     final isPurchasedByMe = item.buyerUid == userState.userId; // ⚡ 구매자인지 확인
     final dateText = DateFormat('yyyy.MM.dd').format(item.date);
 
+    // 🔥 판매자 uid 기반으로 Firestore users/{uid} 실시간 구독
+    final sellerUserAsync = ref.watch(userByIdProvider(item.sellerUid));
+    final ownerName = sellerUserAsync.maybeWhen(
+      data: (u) => u?.username ?? (item.ownerName ?? 'Dreamer'),
+      orElse: () => item.ownerName ?? 'Dreamer',
+    );
+
     // ⚡ 판매된 일기는 접근 불가 (단, 구매자는 접근 가능)
-    if (item.isSold && !isPurchasedByMe) {
+    if (item.isSold && !isPurchasedByMe && !isOwner) {
       return Scaffold(
         appBar: AppBar(
-          leading: const BackButton(color: Color.fromARGB(255, 255, 255, 255)),
-          title: const Text('Access Denied', style: TextStyle(color: Color.fromARGB(255, 255, 255, 255))),
+          leading:
+              const BackButton(color: Color.fromARGB(255, 255, 255, 255)),
+          title: const Text(
+            'Access Denied',
+            style: TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
+          ),
+          backgroundColor: const Color.fromARGB(255, 192, 171, 255),
         ),
         body: const Center(
           child: Column(
@@ -59,9 +77,10 @@ class ShopDetailScreen extends ConsumerWidget {
       backgroundColor: const Color.fromARGB(255, 230, 220, 255),
       appBar: AppBar(
         backgroundColor: const Color.fromARGB(255, 192, 171, 255),
-        leading: const BackButton(color: Color.fromARGB(255, 255, 255, 255)),
+        leading:
+            const BackButton(color: Color.fromARGB(255, 255, 255, 255)),
         title: Text(
-          "$dateText (by ${item.ownerName})",
+          "$dateText (by $ownerName)", // ✅ Firestore 최신 닉네임 사용
           style: const TextStyle(
             color: Color.fromARGB(255, 255, 255, 255),
             fontSize: 16,
@@ -70,12 +89,12 @@ class ShopDetailScreen extends ConsumerWidget {
           ),
         ),
       ),
-      
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 상단 이미지 + Summary/Interpretation
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -83,18 +102,23 @@ class ShopDetailScreen extends ConsumerWidget {
                   backgroundColor: Colors.grey.shade300,
                   borderColor: Colors.black12,
                   borderRadius: 8,
-                  constraints: BoxConstraints.tight(const Size(140, 140)),
+                  constraints:
+                      BoxConstraints.tight(const Size(140, 140)),
                   child: Stack(
                     children: [
                       item.imageUrl != null
-                          ? Image.network(item.imageUrl!, fit: BoxFit.cover)
+                          ? Image.network(
+                              item.imageUrl!,
+                              fit: BoxFit.cover,
+                            )
                           : const Icon(Icons.image, color: Colors.grey),
                       if (!isPurchased && !isOwner && !isPurchasedByMe)
                         Positioned.fill(
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(8),
                             child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                              filter:
+                                  ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                               child: Container(
                                 color: Colors.black.withOpacity(0.1),
                                 child: const Center(
@@ -117,18 +141,21 @@ class ShopDetailScreen extends ConsumerWidget {
                     children: [
                       _buildResultBox(
                         "Summary",
-                        (isPurchased || isOwner || isPurchasedByMe) 
+                        (isPurchased || isOwner || isPurchasedByMe)
                             ? (item.summary ?? "No summary available")
                             : "🔒 Purchase to view summary",
-                        isBlurred: !isPurchased && !isOwner && !isPurchasedByMe,
+                        isBlurred:
+                            !isPurchased && !isOwner && !isPurchasedByMe,
                       ),
                       const SizedBox(height: 10),
                       _buildResultBox(
                         "Interpretation",
-                        (isPurchased || isOwner || isPurchasedByMe) 
-                            ? (item.interpretation ?? "No interpretation available")
+                        (isPurchased || isOwner || isPurchasedByMe)
+                            ? (item.interpretation ??
+                                "No interpretation available")
                             : "🔒 Purchase to view interpretation",
-                        isBlurred: !isPurchased && !isOwner && !isPurchasedByMe,
+                        isBlurred:
+                            !isPurchased && !isOwner && !isPurchasedByMe,
                       ),
                     ],
                   ),
@@ -146,12 +173,14 @@ class ShopDetailScreen extends ConsumerWidget {
               borderColor: Colors.black12,
               borderRadius: 8,
               padding: const EdgeInsets.all(16),
-              constraints:
-                  const BoxConstraints(minWidth: double.infinity, minHeight: 150),
+              constraints: const BoxConstraints(
+                minWidth: double.infinity,
+                minHeight: 150,
+              ),
               child: Stack(
                 children: [
                   Text(
-                    isPurchased ? item.content : item.content,
+                    item.content,
                     style: const TextStyle(fontSize: 14, height: 1.5),
                   ),
                   if (!isPurchased && !isOwner && !isPurchasedByMe)
@@ -159,12 +188,14 @@ class ShopDetailScreen extends ConsumerWidget {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                          filter:
+                              ImageFilter.blur(sigmaX: 5, sigmaY: 5),
                           child: Container(
                             color: Colors.black.withOpacity(0.1),
                             child: const Center(
                               child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.center,
                                 children: [
                                   Icon(
                                     Icons.lock,
@@ -190,7 +221,10 @@ class ShopDetailScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 30),
-            if (!isPurchased && !item.isSold && !isOwner && !isPurchasedByMe)
+            if (!isPurchased &&
+                !item.isSold &&
+                !isOwner &&
+                !isPurchasedByMe)
               Center(
                 child: SizedBox(
                   width: 200,
@@ -228,11 +262,21 @@ class ShopDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildResultBox(String label, String content, {bool isBlurred = false}) {
+  Widget _buildResultBox(
+    String label,
+    String content, {
+    bool isBlurred = false,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         const SizedBox(height: 4),
         WobblyContainer(
           backgroundColor: Colors.white,
@@ -279,11 +323,11 @@ class ShopDetailScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
   ) async {
-    // 이 화면에서 보고 있는 아이템
-    final shopItem = item; // 클래스 필드 ShopItem item
+    final shopItem = item;
 
     // 1) 로그인 확인
-    final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+    final currentUser =
+        firebase_auth.FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please log in first')),
@@ -292,20 +336,25 @@ class ShopDetailScreen extends ConsumerWidget {
     }
 
     // 2) 코인 잔액 체크 (부족하면 미리 막기)
-    final userState = ref.read(userProvider); // 이미 쓰고 있는 유저 프로바이더라고 가정
-    final currentCoins = userState.coins ?? 0;
+    final userState = ref.read(userProvider);
+    final currentCoins = userState.coins; // ✅ int 이므로 null 체크 불필요
 
     if (currentCoins < shopItem.price) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Not enough coins to purchase this item.')),
+        const SnackBar(
+          content:
+              Text('Not enough coins to purchase this item.'),
+        ),
       );
       return;
     }
 
     try {
       // 3) asia-northeast3 리전에 배포된 purchaseMarketItem 함수 호출
-      final functions = FirebaseFunctions.instanceFor(region: 'asia-northeast3');
-      final callable = functions.httpsCallable('purchaseMarketItem');
+      final functions =
+          FirebaseFunctions.instanceFor(region: 'asia-northeast3');
+      final callable =
+          functions.httpsCallable('purchaseMarketItem');
 
       final result = await callable.call(<String, dynamic>{
         'itemId': shopItem.id,
@@ -320,15 +369,15 @@ class ShopDetailScreen extends ConsumerWidget {
         const SnackBar(content: Text('Purchase completed!')),
       );
 
-      // Firestore 쓰기는 전부 Cloud Functions(admin)에서 처리하므로
-      // 여기서는 아무것도 직접 write 하지 않습니다.
-      // (userProvider / shopProvider 가 snapshot을 listen 중이라 자동으로 갱신됨)
+      // Firestore 쓰기는 전부 Cloud Functions(admin)에서 처리
+      // userProvider / shopProvider 가 snapshot을 listen 중이라 자동 갱신
 
-      Navigator.pop(context); // 디테일 화면 닫기 등
+      Navigator.pop(context); // 디테일 화면 닫기
     } on FirebaseFunctionsException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Purchase failed: ${e.code} ${e.message ?? ''}'),
+          content:
+              Text('Purchase failed: ${e.code} ${e.message ?? ''}'),
         ),
       );
     } catch (e) {
@@ -337,6 +386,4 @@ class ShopDetailScreen extends ConsumerWidget {
       );
     }
   }
-
-
 }

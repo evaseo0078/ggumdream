@@ -9,7 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../shop/domain/shop_item.dart';
 
 class UserState {
-  final String username;
+  final String username; // Firestore의 nickname에 해당
   final String userId;
   final int coins;
   final List<ShopItem> purchaseHistory;
@@ -89,7 +89,7 @@ class UserNotifier extends StateNotifier<UserState> {
   CollectionReference<Map<String, dynamic>> get _users =>
       _firestore.collection('users');
 
-  /// ✅ users/{uid} 문서를 실시간으로 listen
+  /// ✅ 현재 로그인 유저의 users/{uid} 문서를 실시간으로 listen
   void _listenUserDoc(String uid) {
     final docRef = _users.doc(uid);
 
@@ -115,7 +115,7 @@ class UserNotifier extends StateNotifier<UserState> {
         state = UserState.fromFirestore(uid, data);
       },
       onError: (_) {
-        // 에러 시에는 상태를 건드리지 않고 무시 (필요시 로그만 추가)
+        // 에러 시에는 상태를 건드리지 않고 무시 (필요시 로그 추가 가능)
       },
     );
   }
@@ -124,8 +124,6 @@ class UserNotifier extends StateNotifier<UserState> {
   Future<void> refresh() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
-    // snapshots()가 이미 listen 중이라, 여기서는 별도 조치 필요 없음
-    // 필요하다면 강제로 한 번 get해서 검증만 할 수도 있음.
     await _users.doc(uid).get();
   }
 
@@ -226,6 +224,21 @@ class UserNotifier extends StateNotifier<UserState> {
   }
 }
 
+/// ✅ 현재 로그인한 유저 (본인) 상태
 final userProvider = StateNotifierProvider<UserNotifier, UserState>((ref) {
   return UserNotifier();
+});
+
+/// ✅ 임의의 uid에 대한 Firestore users/{uid} 문서를 실시간으로 구독
+///    - 마켓에서 sellerUid → 최신 nickname 가져올 때 사용
+final userByIdProvider =
+    StreamProvider.family<UserState?, String>((ref, uid) {
+  final firestore = FirebaseFirestore.instance;
+  final docRef = firestore.collection('users').doc(uid);
+
+  return docRef.snapshots().map((snapshot) {
+    final data = snapshot.data();
+    if (!snapshot.exists || data == null) return null;
+    return UserState.fromFirestore(uid, data);
+  });
 });

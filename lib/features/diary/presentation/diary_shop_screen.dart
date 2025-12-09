@@ -28,12 +28,13 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
     final filteredItems = _showMySales
         ? shopItems.where((item) => item.sellerUid == userState.userId).toList()
         : shopItems.where((item) => item.sellerUid != userState.userId).toList();
-    
+
     // 정렬: isSold=false 가 먼저, isSold=true 가 나중에
     filteredItems.sort((a, b) {
       if (a.isSold == b.isSold) {
         // 같은 상태면 생성 시간 역순 (최신순)
-        return (b.createdAt ?? DateTime.now()).compareTo(a.createdAt ?? DateTime.now());
+        return (b.createdAt ?? DateTime.now())
+            .compareTo(b.createdAt ?? DateTime.now());
       }
       return a.isSold ? 1 : -1; // false(0) < true(1), 즉 판매 안된 것 먼저
     });
@@ -44,26 +45,26 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
           Container(
             decoration: BoxDecoration(
               image: DecorationImage(
-                image: AssetImage('assets/images/shop_background.jpg'),
+                image: const AssetImage('assets/images/shop_background.jpg'),
                 fit: BoxFit.cover,
                 colorFilter: ColorFilter.mode(
-                  Colors.black.withOpacity(1), 
+                  Colors.black.withOpacity(1),
                   BlendMode.dstATop,
                 ),
               ),
             ),
           ),
           Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
                   Color.fromARGB(255, 192, 171, 255),
                   Color.fromARGB(255, 192, 171, 255),
-                  const Color.fromARGB(0, 255, 255, 255),
-                  const Color.fromARGB(0, 255, 255, 255),// 투명도를 더 낮게 설정
-                  const Color.fromARGB(198, 184, 192, 255), // Fully transparent
+                  Color.fromARGB(0, 255, 255, 255),
+                  Color.fromARGB(0, 255, 255, 255),
+                  Color.fromARGB(198, 184, 192, 255),
                 ],
               ),
             ),
@@ -75,7 +76,7 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 20),
                   alignment: Alignment.center,
                   decoration: const BoxDecoration(
-                    color: Colors.transparent, // 컨테이너를 투명하게 설정
+                    color: Colors.transparent,
                   ),
                   child: const Text(
                     "GGUM store",
@@ -88,7 +89,8 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 10),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -104,17 +106,22 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                           const CircleAvatar(
                             radius: 14,
                             backgroundColor: Colors.deepPurple,
-                            child: Icon(Icons.star, color: Colors.white, size: 16),
+                            child: Icon(Icons.star,
+                                color: Colors.white, size: 16),
                           ),
                           const SizedBox(width: 8),
                           GlassCard(
                             radius: 12,
                             opacity: 0.4,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
                               child: Text(
                                 "${userState.coins}",
-                                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.deepPurple,
+                                ),
                               ),
                             ),
                           ),
@@ -134,10 +141,16 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                           ),
                         )
                       : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 20),
                           itemCount: filteredItems.length,
                           itemBuilder: (context, index) {
-                            return _buildShopItem(context, ref, filteredItems[index], userState.userId);
+                            return _buildShopItem(
+                              context,
+                              ref,
+                              filteredItems[index],
+                              userState.userId,
+                            );
                           },
                         ),
                 ),
@@ -160,12 +173,13 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
         radius: 20,
         opacity: isActive ? 0.3 : 0.1,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           child: Text(
             text,
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: isActive ? Colors.white : Colors.grey, // Changed active text color to white
+              color: isActive ? Colors.white : Colors.grey,
             ),
           ),
         ),
@@ -173,20 +187,63 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
     );
   }
 
+  /// 🔥 여기서 sellerUid → Firestore users/{uid} 를 구독해서
+  ///     항상 최신 nickname 을 가져온다.
   Widget _buildShopItem(
     BuildContext context,
     WidgetRef ref,
     ShopItem item,
-    String userId,
+    String currentUserId,
   ) {
-    final isMine = item.sellerUid == userId;
+    final isMine = item.sellerUid == currentUserId;
     final dateText = DateFormat('yyyy.MM.dd').format(item.date);
 
+    final sellerUserAsync = ref.watch(userByIdProvider(item.sellerUid));
+
+    return sellerUserAsync.when(
+      loading: () => _buildShopItemContent(
+        context: context,
+        item: item,
+        dateText: dateText,
+        ownerName: 'Loading...',
+        isMine: isMine,
+      ),
+      error: (_, __) => _buildShopItemContent(
+        context: context,
+        item: item,
+        dateText: dateText,
+        ownerName: item.ownerName ?? 'Unknown',
+        isMine: isMine,
+      ),
+      data: (sellerUser) {
+        final ownerName =
+            sellerUser?.username ?? item.ownerName ?? 'Dreamer';
+        return _buildShopItemContent(
+          context: context,
+          item: item,
+          dateText: dateText,
+          ownerName: ownerName,
+          isMine: isMine,
+        );
+      },
+    );
+  }
+
+  /// 실제 카드 UI는 이 함수에서 한 번만 정의
+  Widget _buildShopItemContent({
+    required BuildContext context,
+    required ShopItem item,
+    required String dateText,
+    required String ownerName,
+    required bool isMine,
+  }) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => ShopDetailScreen(item: item)),
+          MaterialPageRoute(
+            builder: (context) => ShopDetailScreen(item: item),
+          ),
         );
       },
       child: Padding(
@@ -197,26 +254,33 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
           child: Container(
             decoration: BoxDecoration(
               color: item.isSold
-                  ? Color.fromARGB(255, 200, 200, 200).withOpacity(0.5)
-                  : Colors.white.withOpacity(0.2), // Background color based on isSold
+                  ? const Color.fromARGB(255, 200, 200, 200)
+                      .withOpacity(0.5)
+                  : Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(14),
               border: item.isSold
-                  ? Border.all(color: Colors.grey.withOpacity(0.5), width: 2.0) // Light gray border for sold items
+                  ? Border.all(
+                      color: Colors.grey.withOpacity(0.5),
+                      width: 2.0,
+                    )
                   : null,
             ),
             padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 날짜 + Owner
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       dateText,
                       style: TextStyle(
-                        fontSize: 14, // Increased font size
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: item.isSold ? const Color.fromARGB(255, 89, 89, 89) : const Color.fromARGB(255, 255, 255, 255),
+                        color: item.isSold
+                            ? const Color.fromARGB(255, 89, 89, 89)
+                            : const Color.fromARGB(255, 255, 255, 255),
                       ),
                     ),
                     GestureDetector(
@@ -225,7 +289,7 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (context) => UserDreamsGridScreen(
-                              ownerName: item.ownerName,
+                              ownerName: ownerName,      // ✅ 최신 닉네임
                               sellerUid: item.sellerUid,
                             ),
                           ),
@@ -233,11 +297,14 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                       },
                       child: RichText(
                         text: TextSpan(
-                          style: const TextStyle(fontSize: 13, color: Colors.grey),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey,
+                          ),
                           children: [
                             const TextSpan(text: "Owner: "),
                             TextSpan(
-                              text: item.ownerName,
+                              text: ownerName,           // ✅ Firestore 기준
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.black87,
@@ -252,21 +319,31 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
+                    // 썸네일
                     Container(
                       width: 80,
                       height: 80,
                       decoration: BoxDecoration(
                         color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(12), // Rounded corners for images
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: item.imageUrl != null
                           ? ClipRRect(
-                              borderRadius: BorderRadius.circular(12), // Match the container's rounded corners
-                              child: Image.network(item.imageUrl!, fit: BoxFit.cover),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                item.imageUrl!,
+                                fit: BoxFit.cover,
+                              ),
                             )
-                          : Icon(Icons.image, color: item.isSold ? Colors.grey[400] : Colors.grey),
+                          : Icon(
+                              Icons.image,
+                              color: item.isSold
+                                  ? Colors.grey[400]
+                                  : Colors.grey,
+                            ),
                     ),
                     const SizedBox(width: 12),
+                    // Summary + 가격
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,7 +355,9 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                             style: TextStyle(
                               fontSize: 13,
                               height: 1.3,
-                              decoration: item.isSold ? TextDecoration.lineThrough : null,
+                              decoration: item.isSold
+                                  ? TextDecoration.lineThrough
+                                  : null,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -286,14 +365,22 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               if (item.isSold)
-                                const Text("Sold", style: TextStyle(color: Colors.grey))
+                                const Text(
+                                  "Sold",
+                                  style: TextStyle(color: Colors.grey),
+                                )
                               else if (isMine)
-                                const Text("Selling", style: TextStyle(color: Colors.orange)),
+                                const Text(
+                                  "Selling",
+                                  style:
+                                      TextStyle(color: Colors.orange),
+                                ),
                               const SizedBox(width: 12),
                               WobblyPriceTag(
                                 price: item.price,
                                 isSold: item.isSold,
-                                backgroundColor: const Color.fromARGB(108, 197, 171, 255), // Light purple background
+                                backgroundColor:
+                                    const Color.fromARGB(108, 197, 171, 255),
                               ),
                             ],
                           ),
@@ -306,7 +393,7 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
             ),
           ),
         ),
-      )
+      ),
     );
   }
 }
@@ -326,7 +413,8 @@ class WobblyPriceTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: isSold ? Colors.grey : backgroundColor,
         borderRadius: BorderRadius.circular(12),
@@ -335,7 +423,9 @@ class WobblyPriceTag extends StatelessWidget {
       child: Text(
         "$price coins",
         style: TextStyle(
-          color: isSold ? const Color.fromARGB(255, 63, 63, 63) : const Color.fromARGB(255, 255, 255, 255),
+          color: isSold
+              ? const Color.fromARGB(255, 63, 63, 63)
+              : const Color.fromARGB(255, 255, 255, 255),
           fontWeight: FontWeight.bold,
         ),
       ),
