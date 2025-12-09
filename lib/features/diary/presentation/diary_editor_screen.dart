@@ -160,34 +160,62 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     }).toList();
   }
 
-  bool _intervalOverlap(
+ bool _intervalOverlap(
   DateTime aStart,
   DateTime aEnd,
   DateTime bStart,
   DateTime bEnd,
 ) {
-  // 두 구간이 겹치지 않는 경우
-  final noOverlap =
-      aStart.isAtSameMomentAs(bEnd) || aStart.isAfter(bEnd) ||
-      bStart.isAtSameMomentAs(aEnd) || bStart.isAfter(aEnd);
-
-  return !noOverlap;
+  // 표준 구간 겹침 공식
+  return aStart.isBefore(bEnd) && bStart.isBefore(aEnd);
 }
 
+List<DiaryEntry> _entriesOfSameDreamDayForSleep(
+  DiaryEntry candidate,
+  List<DiaryEntry> all,
+) {
+  // 후보 수면 시작 날짜 기준 "밤 날짜" 계산
+  final candidateDay = candidate.sleepStartAt != null
+      ? DateTime(
+          candidate.sleepStartAt!.year,
+          candidate.sleepStartAt!.month,
+          candidate.sleepStartAt!.day,
+        )
+      : DateTime(
+          candidate.date.year,
+          candidate.date.month,
+          candidate.date.day,
+        );
 
-  /// ✅ POST 버튼에서만 적용되는 검증
-  String? _validateSleepOnPost({
+  return all.where((e) {
+    final eDay = e.sleepStartAt != null
+        ? DateTime(
+            e.sleepStartAt!.year,
+            e.sleepStartAt!.month,
+            e.sleepStartAt!.day,
+          )
+        : DateTime(
+            e.date.year,
+            e.date.month,
+            e.date.day,
+          );
+
+    return _sameDay(candidateDay, eDay);
+  }).toList();
+}
+
+String? _validateSleepOnPost({
   required DiaryEntry candidate,
   required List<DiaryEntry> all,
 }) {
   if (candidate.sleepDuration < 0) return null;
 
-  final baseDate = candidate.date;
-  final sameDayEntries = _entriesOfSameDreamDay(baseDate, all)
+  // 🔥 기존 date 기반이 아니라 sleepStartAt 기반으로 묶기
+  final sameDayEntries = _entriesOfSameDreamDayForSleep(candidate, all)
       .where((e) => e.id != candidate.id)
       .toList();
 
-  // 1) 총합 24h 검사
+  // 총 수면시간 24시간 초과 체크
   double existingTotal = 0.0;
   for (final e in sameDayEntries) {
     if (e.sleepDuration > 0) {
@@ -203,7 +231,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
         "시간을 다시 수정해 주세요.";
   }
 
-  // 2) 구간 겹침 검사 (완전히 동일한 시간도 겹침 처리됨)
+  // 구간 겹침 체크
   if (candidate.sleepStartAt != null && candidate.sleepEndAt != null) {
     for (final e in sameDayEntries) {
       if (e.sleepStartAt == null || e.sleepEndAt == null) continue;
@@ -214,8 +242,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
         e.sleepStartAt!,
         e.sleepEndAt!,
       )) {
-        return "이미 기록된 수면 구간과 겹쳐요.\n"
-            "시간을 다시 수정해 주세요.";
+        return "이미 기록된 수면 구간과 겹쳐요.\n시간을 다시 수정해 주세요.";
       }
     }
   }
