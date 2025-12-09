@@ -1,3 +1,4 @@
+// auth_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -14,15 +15,17 @@ class AuthState {
     this.error,
   });
 
+  // ✅ error 유지/초기화를 명확히 제어
   AuthState copyWith({
     bool? isAuthenticated,
     String? username,
     String? error,
+    bool resetError = false,
   }) {
     return AuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       username: username ?? this.username,
-      error: error,
+      error: resetError ? null : (error ?? this.error),
     );
   }
 
@@ -37,14 +40,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// ✅ LoginPage에서 에러 초기화하고 싶을 때 사용
   void clearError() {
-    state = state.copyWith(error: null);
+    state = state.copyWith(resetError: true);
   }
 
   /// ✅ 딱 2개 케이스로 에러 정규화
   String _mapAuthErrorCode(String code) {
     // 1) 이메일 형식 오류
     if (code == 'invalid-email') {
-      return 'Email format is invalid.';
+      return 'Invalid email format.';
     }
 
     // 2) 그 외 로그인 실패는 전부 통합
@@ -54,30 +57,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<bool> login(String email, String password) async {
     try {
-      // 에러 초기화
-      state = state.copyWith(error: null);
+      // ✅ 에러 초기화
+      state = state.copyWith(resetError: true);
 
       await _repo.signIn(email: email, password: password);
 
       state = state.copyWith(
         isAuthenticated: true,
         username: email,
-        error: null,
+        resetError: true,
       );
       return true;
-
     } on FirebaseAuthException catch (e) {
       final msg = _mapAuthErrorCode(e.code);
 
       state = state.copyWith(
         isAuthenticated: false,
         username: null,
-        error: msg, // ✅ 이제 UI는 이 문장만 쓰면 됨
+        error: msg,
       );
       return false;
-
     } catch (_) {
-      // 혹시 repo가 다른 예외를 던져도
       state = state.copyWith(
         isAuthenticated: false,
         username: null,
