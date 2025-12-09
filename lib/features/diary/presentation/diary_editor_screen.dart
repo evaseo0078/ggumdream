@@ -20,11 +20,13 @@ class DiaryEditorScreen extends ConsumerStatefulWidget {
   /// ✅ 선택한 날짜는 "기상일(=아침에 깬 날짜)" 개념으로 사용
   final DateTime selectedDate;
   final DiaryEntry? existingEntry;
+  final String? initialContent;
 
   const DiaryEditorScreen({
     super.key,
     required this.selectedDate,
     this.existingEntry,
+    this.initialContent,
   });
 
   @override
@@ -50,7 +52,8 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     final e = widget.existingEntry;
 
     // 내용
-    _textController = TextEditingController(text: e?.content ?? "");
+    final initialText = e?.content ?? widget.initialContent ?? "";
+    _textController = TextEditingController(text: initialText);
 
     // 수면 unknown 여부
     if (e != null && e.sleepDuration < 0) {
