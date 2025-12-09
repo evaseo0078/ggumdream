@@ -93,7 +93,6 @@ class UserNotifier extends StateNotifier<UserState> {
       await docRef.set({
         'nickname': _auth.currentUser?.email ?? 'Dreamer',
         'email': _auth.currentUser?.email,
-        'coins': 1000,
         'profileImageIndex': 1,
         'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -118,7 +117,6 @@ class UserNotifier extends StateNotifier<UserState> {
     await _users.doc(userId).set(
       {
         'nickname': username,
-        'coins': coins,
       },
       SetOptions(merge: true),
     );
@@ -211,7 +209,6 @@ class UserNotifier extends StateNotifier<UserState> {
 
     await _users.doc(uid).set({
       'nickname': state.username,
-      'coins': state.coins,
     }, SetOptions(merge: true));
   }
 
