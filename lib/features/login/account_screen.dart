@@ -8,9 +8,9 @@ import 'package:go_router/go_router.dart';
 import 'auth_provider.dart';
 import 'auth_repository.dart';
 import 'edit_profile_screen.dart';
-import '../diary/application/user_provider.dart'; // 코인/닉네임 상태
+import '../diary/application/user_provider.dart'; // 코인/닉네임 상태 + userByIdProvider
 import '../diary/application/shop_provider.dart';
-import '../diary/presentation/shop_detail_screen.dart'; // ⚡ import 추가
+import '../diary/presentation/shop_detail_screen.dart';
 import '../shop/domain/shop_item.dart';
 
 class AccountScreen extends ConsumerWidget {
@@ -38,7 +38,7 @@ class AccountScreen extends ConsumerWidget {
             Expanded(
               child: GridView.builder(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 5, // 한 줄에 5개
+                  crossAxisCount: 5,
                   mainAxisSpacing: 10,
                   crossAxisSpacing: 10,
                 ),
@@ -47,13 +47,10 @@ class AccountScreen extends ConsumerWidget {
                   final imageIndex = index + 1; // 1 ~ 5
                   return GestureDetector(
                     onTap: () async {
-                      // Repository 직접 호출 or Provider 통해 호출
-                      // 여기서는 간단히 AuthRepository 인스턴스를 만들어서 호출하거나
-                      // ref를 통해 가져온 provider를 사용해도 됩니다.
                       try {
                         await AuthRepository()
                             .updateProfileImage(userId, imageIndex);
-                        if (context.mounted) Navigator.pop(context); // 닫기
+                        if (context.mounted) Navigator.pop(context);
                       } catch (e) {
                         debugPrint("Error updating profile: $e");
                       }
@@ -112,7 +109,10 @@ class AccountScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text(
           'My Account',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold), // 텍스트 색상을 흰색으로 변경
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: const Color.fromARGB(255, 192, 171, 255),
       ),
@@ -164,19 +164,27 @@ class AccountScreen extends ConsumerWidget {
                             );
                           },
                         ),
-                        // 편집 아이콘 (선택 가능함을 표시)
+                        // 편집 아이콘
                         Positioned(
                           right: 0,
                           bottom: 0,
                           child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
-                              color: Color.fromARGB(255, 255, 255, 255).withOpacity(0.7),
+                              color: const Color.fromARGB(255, 255, 255, 255)
+                                  .withOpacity(0.7),
                               shape: BoxShape.circle,
-                              border: Border.all(color: Color.fromARGB(255, 192, 171, 255), width: 1.2),
+                              border: Border.all(
+                                color:
+                                    const Color.fromARGB(255, 192, 171, 255),
+                                width: 1.2,
+                              ),
                             ),
-                            child: const Icon(Icons.edit,
-                                size: 16, color: Color.fromARGB(255, 192, 171, 255)),
+                            child: const Icon(
+                              Icons.edit,
+                              size: 16,
+                              color: Color.fromARGB(255, 192, 171, 255),
+                            ),
                           ),
                         ),
                       ],
@@ -202,7 +210,6 @@ class AccountScreen extends ConsumerWidget {
                             color: Colors.grey,
                           ),
                         ),
-                        // ✨ Edit Profile 버튼 추가
                         const SizedBox(height: 12),
                         SizedBox(
                           height: 32,
@@ -226,8 +233,10 @@ class AccountScreen extends ConsumerWidget {
                             ),
                             child: const Text(
                               "Edit profile",
-                              style:
-                                  TextStyle(fontSize: 12, color: Colors.black),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.black,
+                              ),
                             ),
                           ),
                         ),
@@ -235,7 +244,7 @@ class AccountScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  // 코인 정보를 오른쪽에 배치
+                  // 코인 정보
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 20, vertical: 12),
@@ -257,8 +266,11 @@ class AccountScreen extends ConsumerWidget {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.monetization_on,
-                                color: Colors.purple, size: 18),
+                            const Icon(
+                              Icons.monetization_on,
+                              color: Colors.purple,
+                              size: 18,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               '$coins',
@@ -294,7 +306,7 @@ class AccountScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 8),
-                Container(
+              Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -302,29 +314,36 @@ class AccountScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: Colors.green.shade200),
                   boxShadow: [
-                  BoxShadow(
-                    color: const Color.fromRGBO(192, 255, 194, 1).withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
+                    BoxShadow(
+                      color: const Color.fromRGBO(192, 255, 194, 1)
+                          .withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
                   ],
                 ),
                 child: myPurchasedItems.isEmpty &&
-                    userState.purchaseHistory.isEmpty
-                  ? const Text("No purchase history.",
-                    style: TextStyle(color: Colors.grey))
-                  : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (myPurchasedItems.isNotEmpty)
-                      ...myPurchasedItems.map(
-                        (item) => _buildPurchaseItem(context, item)),
-                      if (userState.purchaseHistory.isNotEmpty)
-                      ...userState.purchaseHistory.map(
-                        (item) => _buildPurchaseItem(context, item)),
-                    ],
-                    ),
-                ),
+                        userState.purchaseHistory.isEmpty
+                    ? const Text(
+                        "No purchase history.",
+                        style: TextStyle(color: Colors.grey),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (myPurchasedItems.isNotEmpty)
+                            ...myPurchasedItems.map(
+                              (item) =>
+                                  _buildPurchaseItem(context, ref, item),
+                            ),
+                          if (userState.purchaseHistory.isNotEmpty)
+                            ...userState.purchaseHistory.map(
+                              (item) =>
+                                  _buildPurchaseItem(context, ref, item),
+                            ),
+                        ],
+                      ),
+              ),
 
               const SizedBox(height: 24),
 
@@ -346,12 +365,15 @@ class AccountScreen extends ConsumerWidget {
                   border: Border.all(color: Colors.orange.shade100),
                 ),
                 child: mySellingItems.isEmpty
-                    ? const Text("No items currently selling.",
-                        style: TextStyle(color: Colors.grey))
+                    ? const Text(
+                        "No items currently selling.",
+                        style: TextStyle(color: Colors.grey),
+                      )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: mySellingItems
-                            .map((item) => _buildSellingItem(context, item))
+                            .map((item) =>
+                                _buildSellingItem(context, item))
                             .toList(),
                       ),
               ),
@@ -376,8 +398,10 @@ class AccountScreen extends ConsumerWidget {
                   border: Border.all(color: Colors.grey.shade300),
                 ),
                 child: mySoldItems.isEmpty
-                    ? const Text("No sold items.",
-                        style: TextStyle(color: Colors.grey))
+                    ? const Text(
+                        "No sold items.",
+                        style: TextStyle(color: Colors.grey),
+                      )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: mySoldItems
@@ -393,21 +417,21 @@ class AccountScreen extends ConsumerWidget {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () async {
-                    // Firebase + 로컬 로그아웃
-                    await ref.read(authStateProvider.notifier).logout();
+                    await ref
+                        .read(authStateProvider.notifier)
+                        .logout();
 
-                    // 모든 provider 상태를 명시적으로 새로고침
                     ref.invalidate(userProvider);
                     ref.invalidate(shopProvider);
 
-                    // 로그인 화면으로 이동
                     if (context.mounted) {
                       context.go('/login');
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color.fromARGB(255, 192, 171, 255), // 연보라색
-                    foregroundColor: Colors.white, // 흰색 텍스트
+                    backgroundColor:
+                        const Color.fromARGB(255, 192, 171, 255),
+                    foregroundColor: Colors.white,
                   ),
                   child: const Text('Logout'),
                 ),
@@ -419,7 +443,19 @@ class AccountScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPurchaseItem(BuildContext context, ShopItem item) {
+  // ✅ Firestore nickname 실시간 반영 버전
+  Widget _buildPurchaseItem(
+    BuildContext context,
+    WidgetRef ref,
+    ShopItem item,
+  ) {
+    final sellerUserAsync = ref.watch(userByIdProvider(item.sellerUid));
+
+    final ownerName = sellerUserAsync.maybeWhen(
+      data: (u) => u?.username ?? (item.ownerName ?? 'Dreamer'),
+      orElse: () => item.ownerName ?? 'Dreamer',
+    );
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -440,7 +476,8 @@ class AccountScreen extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            const Icon(Icons.shopping_bag, size: 16, color: Colors.green),
+            const Icon(Icons.shopping_bag,
+                size: 16, color: Colors.green),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
@@ -449,13 +486,18 @@ class AccountScreen extends ConsumerWidget {
                   Text(
                     item.summary ?? item.content,
                     style: const TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w500),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    "by ${item.ownerName}",
-                    style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                    "by $ownerName",
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.grey[600],
+                    ),
                   ),
                 ],
               ),
@@ -463,9 +505,10 @@ class AccountScreen extends ConsumerWidget {
             Text(
               "${item.price}c",
               style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green),
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.green,
+              ),
             ),
           ],
         ),
@@ -503,7 +546,9 @@ class AccountScreen extends ConsumerWidget {
                   Text(
                     item.summary ?? item.content,
                     style: const TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w500),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -521,9 +566,10 @@ class AccountScreen extends ConsumerWidget {
             Text(
               "${item.price}c",
               style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange),
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.orange,
+              ),
             ),
           ],
         ),
@@ -542,7 +588,8 @@ class AccountScreen extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.check_circle, size: 16, color: Colors.grey),
+          const Icon(Icons.check_circle,
+              size: 16, color: Colors.grey),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -551,7 +598,9 @@ class AccountScreen extends ConsumerWidget {
                 Text(
                   item.summary ?? item.content,
                   style: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w500),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -569,7 +618,10 @@ class AccountScreen extends ConsumerWidget {
           Text(
             "${item.price}c",
             style: const TextStyle(
-                fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
           ),
         ],
       ),
