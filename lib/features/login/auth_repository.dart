@@ -55,53 +55,50 @@ class AuthRepository {
     final user = _auth.currentUser;
     if (user == null) throw Exception('No user found');
 
-    // Firebase Auth 비밀번호 업데이트
     await user.updatePassword(newPassword);
 
-    // 로컬 저장소 업데이트 (자동 로그인 유지)
     final email = user.email;
     if (email != null && email.isNotEmpty) {
       await saveCredentials(email, newPassword);
     }
   }
 
-  // ✅ [3] 비밀번호 변경 통합 함수 (EditProfileScreen 저장 버튼용 - 이게 없어서 에러 남)
+  // ✅ [3] 비밀번호 변경 통합 함수
   Future<void> changePassword(
-      String currentPassword, String newPassword) async {
+    String currentPassword,
+    String newPassword,
+  ) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception('No user logged in');
 
-    // 재인증 후 업데이트
-    await reauthenticate(email: user.email!, password: currentPassword);
+    final email = user.email;
+    if (email == null || email.isEmpty) {
+      throw Exception('No email found for current user');
+    }
+
+    await reauthenticate(email: email, password: currentPassword);
     await updatePassword(newPassword);
   }
 
-  // ✅ [4] 프로필 이미지 변경 (AccountScreen용)
+  // ✅ [4] 프로필 이미지 변경
   Future<void> updateProfileImage(String userId, int imageIndex) async {
-    try {
-      await _db.collection('users').doc(userId).update({
-        'profileImageIndex': imageIndex,
-      });
-    } catch (e) {
-      throw Exception('Failed to update profile image: $e');
-    }
+    await _db.collection('users').doc(userId).update({
+      'profileImageIndex': imageIndex,
+    });
   }
 
-  // ✅ [5] 닉네임 중복 확인 (SignUp/EditProfile용)
+  // ✅ [5] 닉네임 중복 확인
   Future<bool> checkNickname(String nickname) async {
-    try {
-      final result = await _db
-          .collection('users')
-          .where('nickname', isEqualTo: nickname)
-          .limit(1)
-          .get();
-      return result.docs.isEmpty; // 문서가 없으면 사용 가능
-    } catch (e) {
-      throw Exception("Failed to check nickname: $e");
-    }
+    final result = await _db
+        .collection('users')
+        .where('nickname', isEqualTo: nickname)
+        .limit(1)
+        .get();
+    return result.docs.isEmpty;
   }
 
-  // ✅ Email 중복 확인 (사용 가능하면 true 반환)
+  // ✅ Email 중복 확인 (Firestore 기준)
+  // - 지금 너 구조에선 users 컬렉션이 소스 오브 트루스라 이게 제일 안정적
   Future<bool> checkEmail(String email) async {
     final result = await _db
         .collection('users')
@@ -127,21 +124,15 @@ class AuthRepository {
     User? user;
 
     // Firebase Auth 계정 생성
-    try {
-      final cred = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      user = cred.user;
-    } on FirebaseAuthException catch (e) {
-      throw e;
-    } catch (e) {
-      rethrow;
-    }
+    final cred = await _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    user = cred.user;
 
     if (user == null) throw Exception("User creation failed");
 
-    // Firestore 저장
+    // Firestore 저장 (✅ 디폴트 코인 1000)
     await _db.collection('users').doc(user.uid).set({
       'name': name,
       'nickname': nickname,
@@ -156,8 +147,14 @@ class AuthRepository {
   }
 
   // ✅ [7] 로그인
-  Future<void> signIn({required String email, required String password}) async {
-    await _auth.signInWithEmailAndPassword(email: email, password: password);
+  Future<void> signIn({
+    required String email,
+    required String password,
+  }) async {
+    await _auth.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
     await saveCredentials(email, password);
   }
 
@@ -174,6 +171,9 @@ class AuthRepository {
     await deleteCredentials();
   }
 
+  // ----------------------------
+  // Secure storage
+  // ----------------------------
   Future<void> saveCredentials(String username, String password) async {
     await _storage.write(key: _keyUsername, value: username);
     await _storage.write(key: _keyPassword, value: password);
