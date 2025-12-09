@@ -22,11 +22,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   bool _isLoading = false;
   bool _isPasswordVisible = false;
 
+  // ✅ UI에만 띄울 로컬 에러
+  String? _localError;
+
   // -----------------------------
   // Basic email validation
   // -----------------------------
   bool _isValidEmail(String email) {
-    // Simple and not too strict
     final regex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
     return regex.hasMatch(email);
   }
@@ -39,13 +41,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   String _mapRawErrorToMessage(String raw) {
     final s = raw.toLowerCase();
 
-    // invalid email only
     if (s.contains('invalid-email')) {
       return 'Invalid email format.';
     }
 
-    // Everything else -> unify
-    // wrong-password, user-not-found, invalid-credential, too-many-requests, etc.
     return 'Email or password is incorrect.';
   }
 
@@ -56,34 +55,37 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     return 'Email or password is incorrect.';
   }
 
-  void _showErrorSnack(String message) {
+  void _setLocalError(String? message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    setState(() {
+      _localError = message;
+    });
   }
 
   Future<void> _handleLogin() async {
     if (_isLoading) return;
 
     final email = _emailController.text.trim();
-    final password = _passwordController.text; // no trim for safety
+    final password = _passwordController.text;
+
+    // ✅ 시도할 때 기존 로컬 에러는 일단 제거
+    _setLocalError(null);
 
     // -----------------------------
     // UI-level validation (English)
     // -----------------------------
     if (email.isEmpty || password.isEmpty) {
-      _showErrorSnack('Please enter both email and password.');
+      _setLocalError('Please enter both email and password.');
       return;
     }
 
     if (!_isValidEmail(email)) {
-      _showErrorSnack('Invalid email format.');
+      _setLocalError('Invalid email format.');
       return;
     }
 
     if (password.length < 6) {
-      _showErrorSnack('Password must be at least 6 characters.');
+      _setLocalError('Password must be at least 6 characters.');
       return;
     }
 
@@ -97,22 +99,22 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       if (!mounted) return;
 
       if (success) {
+        _setLocalError(null);
         context.go('/');
         return;
       }
 
-      // If provider returns false without throwing
+      // provider가 false만 반환한 케이스
       final rawErr = ref.read(authStateProvider).error;
       final friendly = (rawErr == null || rawErr.trim().isEmpty)
           ? 'Email or password is incorrect.'
           : _mapRawErrorToMessage(rawErr);
 
-      _showErrorSnack(friendly);
+      _setLocalError(friendly);
     } on FirebaseAuthException catch (e) {
-      _showErrorSnack(_mapAuthExceptionToMessage(e));
+      _setLocalError(_mapAuthExceptionToMessage(e));
     } catch (_) {
-      // Unknown error -> keep it safe but not too detailed
-      _showErrorSnack('Email or password is incorrect.');
+      _setLocalError('Email or password is incorrect.');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -131,11 +133,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
 
-    // Inline error also uses the same mapping
-    final friendlyInlineError = (authState.error == null ||
+    // ✅ provider error를 UI에 쓸 경우도 동일 규칙 적용
+    // 단, 로컬 에러가 있으면 로컬을 우선 (중복 방지)
+    final friendlyProviderError = (authState.error == null ||
             authState.error!.trim().isEmpty)
         ? null
         : _mapRawErrorToMessage(authState.error!);
+
+    final displayError = _localError ?? friendlyProviderError;
 
     return Scaffold(
       appBar: AppBar(
@@ -158,8 +163,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               child: Image.asset(
                 'assets/images/login_background.jpg',
                 fit: BoxFit.cover,
-                color: const Color.fromARGB(255, 255, 255, 255)
-                    .withOpacity(0.7),
+                color:
+                    const Color.fromARGB(255, 255, 255, 255).withOpacity(0.7),
                 colorBlendMode: BlendMode.darken,
               ),
             ),
@@ -195,6 +200,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
+                        onChanged: (_) {
+                          // 입력 중엔 에러를 과하게 지우고 싶지 않으면 주석 가능
+                          if (_localError != null) _setLocalError(null);
+                        },
                         decoration: InputDecoration(
                           labelText: 'Email',
                           border: const OutlineInputBorder(
@@ -204,8 +213,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             ),
                           ),
                           filled: true,
-                          fillColor: const Color.fromARGB(255, 255, 255, 255)
-                              .withOpacity(0.3),
+                          fillColor:
+                              const Color.fromARGB(255, 255, 255, 255)
+                                  .withOpacity(0.3),
                         ),
                       ),
                     ),
@@ -218,6 +228,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         controller: _passwordController,
                         textInputAction: TextInputAction.done,
                         onSubmitted: (_) => _handleLogin(),
+                        onChanged: (_) {
+                          if (_localError != null) _setLocalError(null);
+                        },
                         decoration: InputDecoration(
                           labelText: 'Password',
                           border: const OutlineInputBorder(
@@ -227,8 +240,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             ),
                           ),
                           filled: true,
-                          fillColor: const Color.fromARGB(255, 255, 255, 255)
-                              .withOpacity(0.3),
+                          fillColor:
+                              const Color.fromARGB(255, 255, 255, 255)
+                                  .withOpacity(0.3),
                           suffixIcon: IconButton(
                             icon: Icon(
                               _isPasswordVisible
@@ -248,12 +262,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     ),
                     const SizedBox(height: 15),
 
-                    // Inline error (friendly)
-                    if (friendlyInlineError != null)
+                    // ✅ Inline error (UI only)
+                    if (displayError != null)
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: Text(
-                          friendlyInlineError,
+                          displayError,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: Colors.red,
