@@ -6,8 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shop/domain/shop_item.dart';
 
-const int kDefaultCoins = 1000;
-
 class UserState {
   final String username;
   final String userId;
@@ -23,24 +21,19 @@ class UserState {
     this.salesHistory = const [],
   });
 
-  factory UserState.initial() => const UserState(
-        username: 'Dreamer',
-        userId: '',
-        coins: kDefaultCoins,
-      );
+  factory UserState.initial() =>
+      const UserState(username: 'Dreamer', userId: '', coins: 0);
 
   factory UserState.fromFirestore(String uid, Map<String, dynamic> data) {
-    final coinsRaw = data['coins'];
-
     return UserState(
       username: data['nickname'] as String? ??
           data['name'] as String? ??
           data['email'] as String? ??
           'Dreamer',
       userId: uid,
-      coins: (coinsRaw is num) ? coinsRaw.toInt() : kDefaultCoins,
-      purchaseHistory: [], // TODO
-      salesHistory: [], // TODO
+      coins: (data['coins'] is num) ? (data['coins'] as num).toInt() : 0,
+      purchaseHistory: [],
+      salesHistory: [],
     );
   }
 
@@ -86,36 +79,29 @@ class UserNotifier extends StateNotifier<UserState> {
   CollectionReference<Map<String, dynamic>> get _users =>
       _firestore.collection('users');
 
-  Future<void> _ensureUserDoc(String uid, {String? email}) async {
-    final ref = _users.doc(uid);
-    final doc = await ref.get();
-
-    if (!doc.exists) {
-      await ref.set({
-        'nickname': email ?? 'Dreamer',
-        'coins': kDefaultCoins,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    } else {
-      final data = doc.data();
-      if (data != null && !data.containsKey('coins')) {
-        await ref.set({'coins': kDefaultCoins}, SetOptions(merge: true));
-      }
-    }
-  }
-
+  // ✅ 핵심: 문서 없으면 자동 생성 + 1000 코인 보정
   Future<void> _loadUser() async {
     if (!mounted) return;
 
-    final user = _auth.currentUser;
-    final uid = user?.uid;
+    final uid = _auth.currentUser?.uid;
     if (uid == null) return;
 
-    await _ensureUserDoc(uid, email: user?.email);
+    final docRef = _users.doc(uid);
+    final doc = await docRef.get();
 
-    final doc = await _users.doc(uid).get();
-    if (doc.exists && mounted) {
-      state = UserState.fromFirestore(uid, doc.data()!);
+    if (!doc.exists) {
+      await docRef.set({
+        'nickname': _auth.currentUser?.email ?? 'Dreamer',
+        'email': _auth.currentUser?.email,
+        'coins': 1000,
+        'profileImageIndex': 1,
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+
+    final fresh = await docRef.get();
+    if (fresh.exists && mounted) {
+      state = UserState.fromFirestore(uid, fresh.data()!);
     }
   }
 
@@ -139,7 +125,9 @@ class UserNotifier extends StateNotifier<UserState> {
   }
 
   Future<bool> spendCoins(int amount) async {
+    if (amount <= 0) return true;
     if (state.coins < amount) return false;
+
     final uid = _auth.currentUser?.uid;
     if (uid == null) return false;
 
@@ -150,6 +138,8 @@ class UserNotifier extends StateNotifier<UserState> {
   }
 
   Future<void> earnCoins(int amount) async {
+    if (amount <= 0) return;
+
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
 
@@ -158,6 +148,7 @@ class UserNotifier extends StateNotifier<UserState> {
     state = state.copyWith(coins: newBalance, userId: uid);
   }
 
+  // Purchase an item
   bool purchaseItem(ShopItem item) {
     if (state.coins < item.price) return false;
 
@@ -171,20 +162,22 @@ class UserNotifier extends StateNotifier<UserState> {
     return true;
   }
 
+  // Record a sale
   void recordSale(ShopItem item) {
     final newSalesHistory = [...state.salesHistory, item];
     state = state.copyWith(salesHistory: newSalesHistory);
     _updateUserData();
   }
 
+  // Cancel a sale
   void cancelSale(String diaryId) {
-    final newSalesHistory = state.salesHistory
-        .where((item) => item.diaryId != diaryId)
-        .toList();
+    final newSalesHistory =
+        state.salesHistory.where((item) => item.diaryId != diaryId).toList();
     state = state.copyWith(salesHistory: newSalesHistory);
     _updateUserData();
   }
 
+  // Update sale price
   void updateSalePrice(String diaryId, int newPrice) {
     final newSalesHistory = state.salesHistory.map((item) {
       if (item.diaryId == diaryId) {
