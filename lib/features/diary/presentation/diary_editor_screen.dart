@@ -226,9 +226,9 @@ String? _validateSleepOnPost({
   final newTotal = existingTotal + candidate.sleepDuration;
   if (newTotal > 24.0 + 1e-6) {
     final remain = (24.0 - existingTotal).clamp(0.0, 24.0);
-    return "수면 시간이 24시간을 초과했어요.\n"
-        "오늘 남은 수면 가능 시간: ${remain.toStringAsFixed(1)}h\n"
-        "시간을 다시 수정해 주세요.";
+    return "Sleep duration exceeds 24 hours.\n"
+        "Remaining sleep time for today: ${remain.toStringAsFixed(1)}h\n"
+        "Please adjust the time.";
   }
 
   // 구간 겹침 체크
@@ -242,7 +242,7 @@ String? _validateSleepOnPost({
         e.sleepStartAt!,
         e.sleepEndAt!,
       )) {
-        return "이미 기록된 수면 구간과 겹쳐요.\n시간을 다시 수정해 주세요.";
+        return "This sleep period overlaps with an existing record.\nPlease adjust the time.";
       }
     }
   }print("------ SLEEP VALIDATION DEBUG ------");
@@ -366,12 +366,10 @@ print("-------------------------------------");
         _validateSleepOnPost(candidate: tempEntryForValidation, all: allDiaries);
 
     if (err != null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(err)),
-      );
-      return;
-    }
+  if (!mounted) return;
+  _showErrorDialog(err);
+  return;
+}
 
     // ✅ LLM 로딩
     showDialog(
@@ -786,4 +784,39 @@ print("-------------------------------------");
       ),
     );
   }
+  void _showErrorDialog(String message) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        title: const Text(
+          "⚠ Notion",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontSize: 15,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              "OK",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 }
