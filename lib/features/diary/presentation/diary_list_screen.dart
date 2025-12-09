@@ -19,6 +19,7 @@ import '../application/user_provider.dart';
 import '../domain/diary_entry.dart';
 import 'diary_detail_screen.dart';
 import 'diary_editor_screen.dart';
+import 'dream_sketch_screen.dart';
 
 /// 뷰 모드
 enum ViewMode { calendar, list, grid }
@@ -192,6 +193,13 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                             fontWeight: FontWeight.bold,
                             fontFamily: 'Stencil',
                             color: Color.fromARGB(255, 255, 255, 255),
+                            shadows: [
+                              Shadow(
+                                offset: Offset(1, 1),
+                                blurRadius: 2,
+                                color: Color.fromARGB(98, 216, 216, 216),
+                              ),
+                            ],
                           ),
                         ),
                         IconButton(
@@ -458,6 +466,42 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                     Icons.analytics,
                     color: Colors.white,
                     size: 24,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 드림 스케치 버튼
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const DreamSketchScreen(),
+                ),
+              );
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(50),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.25),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.4),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.brush,
+                    color: Colors.white,
+                    size: 26,
                   ),
                 ),
               ),

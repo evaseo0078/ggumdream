@@ -65,6 +65,7 @@ dependencies:
   google_mlkit_text_recognition: ^0.13.1 # Google ML Kit OCR
   flutter_image_compress: ^2.4.0
   #-----------------------------------------
+  signature: ^5.4.1 # 드림 스케치 캔버스(한서)
 
 dev_dependencies:
   flutter_test:
