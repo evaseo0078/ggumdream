@@ -137,7 +137,6 @@ class AuthRepository {
       'name': name,
       'nickname': nickname,
       'email': email,
-      'coins': 1000,
       'profileImageIndex': 1,
       'createdAt': FieldValue.serverTimestamp(),
     });

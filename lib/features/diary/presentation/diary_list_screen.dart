@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:cloud_functions/cloud_functions.dart';
 
 import 'stats_screen.dart';
 
@@ -1166,40 +1167,92 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     );
   }
 
-  void _registerToShop(
-    BuildContext context,
-    WidgetRef ref,
-    DiaryEntry entry,
-    int price,
-  ) async {
-    try {
-      final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
-      if (currentUser == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Please log in first")),
-        );
-        return;
-      }
+      void _registerToShop(
+        BuildContext context,
+        WidgetRef ref,
+        DiaryEntry entry,
+        int price,
+      ) async {
+        try {
+          final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+          if (currentUser == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Please log in first")),
+            );
+            return;
+          }
 
-      final newItem = await ref.read(shopProvider.notifier).createListing(
-            diary: entry,
-            ownerId: currentUser.uid,
-            ownerName: ref.read(userProvider).username,
+          final username = ref.read(userProvider).username;
+
+          // ✅ asia-northeast3 리전에 있는 Cloud Functions 인스턴스 사용
+          final FirebaseFunctions functions =
+              FirebaseFunctions.instanceFor(region: 'asia-northeast3');
+
+          // ✅ onCall 이름 그대로
+          final HttpsCallable callable =
+              functions.httpsCallable('createMarketItem');
+
+          // ✅ 서버에 마켓 아이템 생성 요청 (메타데이터 모두 포함)
+          final HttpsCallableResult result =
+              await callable.call(<String, dynamic>{
+            'diaryId': entry.id,
+            'price': price,
+            'ownerName': username,
+            // 추가 메타데이터
+            'content': entry.content,
+            'summary': entry.summary,
+            'interpretation': entry.interpretation,
+            'imageUrl': entry.imageUrl,
+            'date': entry.date.toIso8601String(),
+          });
+
+          final data = result.data as Map<dynamic, dynamic>;
+          final String marketItemId = data['id'] as String;
+
+          // ✅ 앱 내부 상태에도 새 ShopItem 반영
+          final newItem = ShopItem(
+            id: marketItemId,
+            diaryId: entry.id,
+            sellerUid: currentUser.uid,
+            ownerName: username,
+            date: entry.date,
+            content: entry.content,
             price: price,
+            summary: entry.summary,
+            interpretation: entry.interpretation,
+            imageUrl: entry.imageUrl,
+            buyerUid: null,
+            isSold: false,
+            createdAt: DateTime.now(),
+            purchasedAt: null,
           );
 
-      ref.read(diaryListProvider.notifier).setSellStatus(entry.id, true);
-      ref.read(userProvider.notifier).recordSale(newItem);
+          // shopProvider 쪽에 addOrUpdate 같은 메서드가 있다면 사용
+          ref.read(shopProvider.notifier).addOrUpdate(newItem);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Registered for $price coins!")),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to register: $e")),
-      );
-    }
-  }
+          // 일기 리스트에서도 판매중 상태로
+          ref.read(diaryListProvider.notifier).setSellStatus(entry.id, true);
+
+          // 유저 정보(내 판매 목록, 통계 등) 업데이트
+          ref.read(userProvider.notifier).recordSale(newItem);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Registered for $price coins!")),
+          );
+        } on FirebaseFunctionsException catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Failed to register: ${e.code} ${e.message}"),
+            ),
+          );
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Failed to register: $e")),
+          );
+        }
+      }
+
+
 
   void _cancelSale(BuildContext context, WidgetRef ref, DiaryEntry entry) {
     ref.read(diaryListProvider.notifier).setSellStatus(entry.id, false);

@@ -160,62 +160,96 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     }).toList();
   }
 
-  bool _intervalOverlap(
-    DateTime aStart,
-    DateTime aEnd,
-    DateTime bStart,
-    DateTime bEnd,
-  ) {
-    return aStart.isBefore(bEnd) && bStart.isBefore(aEnd);
+ bool _intervalOverlap(
+  DateTime aStart,
+  DateTime aEnd,
+  DateTime bStart,
+  DateTime bEnd,
+) {
+  // 표준 구간 겹침 공식
+  return aStart.isBefore(bEnd) && bStart.isBefore(aEnd);
+}
+
+List<DiaryEntry> _entriesOfSameDreamDayForSleep(
+  DiaryEntry candidate,
+  List<DiaryEntry> all,
+) {
+  // 후보 수면 시작 날짜 기준 "밤 날짜" 계산
+  final candidateDay = candidate.sleepStartAt != null
+      ? DateTime(
+          candidate.sleepStartAt!.year,
+          candidate.sleepStartAt!.month,
+          candidate.sleepStartAt!.day,
+        )
+      : DateTime(
+          candidate.date.year,
+          candidate.date.month,
+          candidate.date.day,
+        );
+
+  return all.where((e) {
+    final eDay = e.sleepStartAt != null
+        ? DateTime(
+            e.sleepStartAt!.year,
+            e.sleepStartAt!.month,
+            e.sleepStartAt!.day,
+          )
+        : DateTime(
+            e.date.year,
+            e.date.month,
+            e.date.day,
+          );
+
+    return _sameDay(candidateDay, eDay);
+  }).toList();
+}
+
+String? _validateSleepOnPost({
+  required DiaryEntry candidate,
+  required List<DiaryEntry> all,
+}) {
+  if (candidate.sleepDuration < 0) return null;
+
+  // 🔥 기존 date 기반이 아니라 sleepStartAt 기반으로 묶기
+  final sameDayEntries = _entriesOfSameDreamDayForSleep(candidate, all)
+      .where((e) => e.id != candidate.id)
+      .toList();
+
+  // 총 수면시간 24시간 초과 체크
+  double existingTotal = 0.0;
+  for (final e in sameDayEntries) {
+    if (e.sleepDuration > 0) {
+      existingTotal += e.sleepDuration;
+    }
   }
 
-  /// ✅ POST 버튼에서만 적용되는 검증
-  String? _validateSleepOnPost({
-    required DiaryEntry candidate,
-    required List<DiaryEntry> all,
-  }) {
-    if (candidate.sleepDuration < 0) return null;
+  final newTotal = existingTotal + candidate.sleepDuration;
+  if (newTotal > 24.0 + 1e-6) {
+    final remain = (24.0 - existingTotal).clamp(0.0, 24.0);
+    return "수면 시간이 24시간을 초과했어요.\n"
+        "오늘 남은 수면 가능 시간: ${remain.toStringAsFixed(1)}h\n"
+        "시간을 다시 수정해 주세요.";
+  }
 
-    final baseDate = candidate.date;
-    final sameDayEntries = _entriesOfSameDreamDay(baseDate, all)
-        .where((e) => e.id != candidate.id)
-        .toList();
-
-    // 1) 총합 24h 검사
-    double existingTotal = 0.0;
+  // 구간 겹침 체크
+  if (candidate.sleepStartAt != null && candidate.sleepEndAt != null) {
     for (final e in sameDayEntries) {
-      if (e.sleepDuration > 0) {
-        existingTotal += e.sleepDuration;
+      if (e.sleepStartAt == null || e.sleepEndAt == null) continue;
+
+      if (_intervalOverlap(
+        candidate.sleepStartAt!,
+        candidate.sleepEndAt!,
+        e.sleepStartAt!,
+        e.sleepEndAt!,
+      )) {
+        return "이미 기록된 수면 구간과 겹쳐요.\n시간을 다시 수정해 주세요.";
       }
     }
-
-    final newTotal = existingTotal + candidate.sleepDuration;
-    if (newTotal > 24.0 + 1e-6) {
-      final remain = (24.0 - existingTotal).clamp(0.0, 24.0);
-      return "수면 시간이 24시간을 초과했어요.\n"
-          "오늘 남은 수면 가능 시간: ${remain.toStringAsFixed(1)}h\n"
-          "시간을 다시 수정해 주세요.";
-    }
-
-    // 2) 구간 겹침 검사
-    if (candidate.sleepStartAt != null && candidate.sleepEndAt != null) {
-      for (final e in sameDayEntries) {
-        if (e.sleepStartAt == null || e.sleepEndAt == null) continue;
-
-        if (_intervalOverlap(
-          candidate.sleepStartAt!,
-          candidate.sleepEndAt!,
-          e.sleepStartAt!,
-          e.sleepEndAt!,
-        )) {
-          return "이미 기록된 수면 구간과 겹쳐요.\n"
-              "시간을 다시 수정해 주세요.";
-        }
-      }
-    }
-
-    return null;
   }
+
+  return null;
+}
+
 
   // ───────────────── 저장 로직 ─────────────────
 
