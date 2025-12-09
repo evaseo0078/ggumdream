@@ -245,7 +245,18 @@ String? _validateSleepOnPost({
         return "이미 기록된 수면 구간과 겹쳐요.\n시간을 다시 수정해 주세요.";
       }
     }
-  }
+  }print("------ SLEEP VALIDATION DEBUG ------");
+print("Candidate:");
+print("  start = ${candidate.sleepStartAt}");
+print("  end   = ${candidate.sleepEndAt}");
+
+print("Same day entries (${sameDayEntries.length}):");
+for (final e in sameDayEntries) {
+  print("Entry ${e.id}:");
+  print("  start = ${e.sleepStartAt}");
+  print("  end   = ${e.sleepEndAt}");
+}
+print("-------------------------------------");
 
   return null;
 }
