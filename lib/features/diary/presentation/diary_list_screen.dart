@@ -476,10 +476,13 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
           // 드림 스케치 버튼
           GestureDetector(
             onTap: () {
+              final dateToWrite = _selectedDay ?? DateTime.now();
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const DreamSketchScreen(),
+                  builder: (context) => DreamSketchScreen(
+                    selectedDate: dateToWrite,
+                  ),
                 ),
               );
             },

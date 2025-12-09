@@ -7,7 +7,12 @@ import '../application/ai_provider.dart';
 import 'diary_editor_screen.dart';
 
 class DreamSketchScreen extends ConsumerStatefulWidget {
-  const DreamSketchScreen({super.key});
+  final DateTime selectedDate;
+  
+  const DreamSketchScreen({
+    super.key,
+    required this.selectedDate,
+  });
 
   @override
   ConsumerState<DreamSketchScreen> createState() => _DreamSketchScreenState();
@@ -62,7 +67,7 @@ class _DreamSketchScreenState extends ConsumerState<DreamSketchScreen> {
         context,
         MaterialPageRoute(
           builder: (context) => DiaryEditorScreen(
-            selectedDate: DateTime.now(),
+            selectedDate: widget.selectedDate,
             initialContent: interpretation,
           ),
         ),
