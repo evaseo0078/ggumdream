@@ -2,7 +2,9 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-
+import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:cloud_functions/cloud_functions.dart';
 import '../../../home/home_shell.dart';
 import '../../shop/domain/shop_item.dart';
 import '../application/shop_provider.dart';
@@ -272,61 +274,69 @@ class ShopDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _confirmPurchase(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text("Confirm Purchase"),
-          content: Text(
-            "Do you really want to buy this dream for ${item.price} coins?",
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text("No"),
-            ), 
-            TextButton(
-              onPressed: () async {
-                Navigator.pop(dialogContext);
-                final userState = ref.read(userProvider);
-                if (userState.userId.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Please sign in first.")),
-                  );
-                  return;
-                }
+  // 구매 확정 로직 – Cloud Functions purchaseMarketItem만 호출
+  Future<void> _confirmPurchase(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    // 이 화면에서 보고 있는 아이템
+    final shopItem = item; // 클래스 필드 ShopItem item
 
-                final spent = await ref
-                    .read(userProvider.notifier)
-                    .spendCoins(item.price);
-                if (!spent) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Not enough coins!")),
-                    );
-                  }
-                  return;
-                }
+    // 1) 로그인 확인
+    final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in first')),
+      );
+      return;
+    }
 
-                await ref.read(purchaseRepositoryProvider).recordPurchase(item);
-                await ref
-                    .read(shopProvider.notifier)
-                    .markAsSold(item.id, buyerId: userState.userId);
+    // 2) 코인 잔액 체크 (부족하면 미리 막기)
+    final userState = ref.read(userProvider); // 이미 쓰고 있는 유저 프로바이더라고 가정
+    final currentCoins = userState.coins ?? 0;
 
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Purchase Successful!")),
-                  );
-                  Navigator.pop(context);
-                  ref.read(homeTabProvider.notifier).state = 2;
-                }
-              },
-              child: const Text("Yes"),
-            ),
-          ],
-        );
-      },
-    );
+    if (currentCoins < shopItem.price) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Not enough coins to purchase this item.')),
+      );
+      return;
+    }
+
+    try {
+      // 3) asia-northeast3 리전에 배포된 purchaseMarketItem 함수 호출
+      final functions = FirebaseFunctions.instanceFor(region: 'asia-northeast3');
+      final callable = functions.httpsCallable('purchaseMarketItem');
+
+      final result = await callable.call(<String, dynamic>{
+        'itemId': shopItem.id,
+      });
+
+      if (kDebugMode) {
+        print('purchaseMarketItem result: ${result.data}');
+      }
+
+      // 4) UI 피드백
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Purchase completed!')),
+      );
+
+      // Firestore 쓰기는 전부 Cloud Functions(admin)에서 처리하므로
+      // 여기서는 아무것도 직접 write 하지 않습니다.
+      // (userProvider / shopProvider 가 snapshot을 listen 중이라 자동으로 갱신됨)
+
+      Navigator.pop(context); // 디테일 화면 닫기 등
+    } on FirebaseFunctionsException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Purchase failed: ${e.code} ${e.message ?? ''}'),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Purchase failed: $e')),
+      );
+    }
   }
+
+
 }

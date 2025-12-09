@@ -14,7 +14,7 @@ const bucket = admin.storage().bucket();
 const FieldValue = admin.firestore.FieldValue;
 
 // ====================================================================
-// 1) Pollinations 이미지 생성 (v2 callable)
+// 1) Pollinations 이미지 생성
 // ====================================================================
 export const generateImageFromPollinations = onCall(
   { region: "asia-northeast3" },
@@ -72,7 +72,7 @@ export const generateImageFromPollinations = onCall(
 );
 
 // ====================================================================
-// 2) 회원가입 1000코인 지급 (Auth Trigger, v1)
+// 2) 회원가입 1000코인 지급 (Auth Trigger)
 // ====================================================================
 export const grantSignupBonus = functions
   .region("asia-northeast3")
@@ -86,7 +86,7 @@ export const grantSignupBonus = functions
       const userSnap = await tx.get(userRef);
       const userData = userSnap.exists ? userSnap.data()! : {};
 
-      // 이미 지급한 경우 종료
+      // 이미 지급했으면 종료
       if (userData.signupBonusGranted) return;
 
       const now = FieldValue.serverTimestamp();
@@ -122,7 +122,7 @@ export const grantSignupBonus = functions
   });
 
 // ====================================================================
-// 3) 마켓 아이템 구매 (Callable, v2) — 단일 트랜잭션
+// 3) 마켓 아이템 구매 (Callable) — 단일 트랜잭션
 // ====================================================================
 type MarketStatus = "listed" | "sold" | "cancelled";
 
@@ -150,7 +150,18 @@ export const purchaseMarketItem = onCall(
         }
 
         const item = itemSnap.data()!;
-        const status = item.status as MarketStatus;
+
+        // 🔥 기존(old) 문서 호환 처리
+        // - status 필드가 없으면 buyerUid 여부로 유추
+        let status = item.status as MarketStatus | undefined;
+        if (!status) {
+          if (item.buyerUid) {
+            status = "sold";
+          } else {
+            status = "listed";
+          }
+        }
+
         const sellerUid = item.sellerUid as string;
         const price = item.price as number;
         const diaryId = item.diaryId as string;
@@ -162,14 +173,14 @@ export const purchaseMarketItem = onCall(
         if (sellerUid === buyerUid) {
           throw new HttpsError(
             "failed-precondition",
-            "You cannot buy your own item.",
+            "You cannot buy your own item."
           );
         }
 
         if (status !== "listed") {
           throw new HttpsError(
             "failed-precondition",
-            "Item is not available.",
+            "Item is not available."
           );
         }
 
@@ -178,13 +189,16 @@ export const purchaseMarketItem = onCall(
         if (!buyerSnap.exists) {
           throw new HttpsError(
             "failed-precondition",
-            "Buyer profile not found.",
+            "Buyer profile not found."
           );
         }
 
         const buyerCoins = (buyerSnap.data()!.coins ?? 0) as number;
         if (buyerCoins < price) {
-          throw new HttpsError("failed-precondition", "Insufficient coins.");
+          throw new HttpsError(
+            "failed-precondition",
+            "Insufficient coins."
+          );
         }
 
         // Seller
@@ -196,21 +210,22 @@ export const purchaseMarketItem = onCall(
 
         // Ledger
         const buyerLedgerRef =
-          buyerRef.collection("coin_ledger").doc(purchaseTxId);
+            buyerRef.collection("coin_ledger").doc(purchaseTxId);
         const sellerLedgerRef =
-          sellerRef.collection("coin_ledger").doc(purchaseTxId);
+            sellerRef.collection("coin_ledger").doc(purchaseTxId);
 
         // 구매/판매 기록
         const purchaseDocRef =
-          buyerRef.collection("purchases").doc(purchaseTxId);
+            buyerRef.collection("purchases").doc(purchaseTxId);
         const saleDocRef =
-          sellerRef.collection("sales").doc(purchaseTxId);
+            sellerRef.collection("sales").doc(purchaseTxId);
 
         // --------------------------------------------------------
-        // 트랜잭션: 아이템 상태 업데이트
+        // 트랜잭션: 아이템 상태 업데이트 + 코인 이동
         // --------------------------------------------------------
         tx.update(itemRef, {
           status: "sold",
+          isSold: true,
           buyerUid,
           soldAt: now,
           updatedAt: now,
@@ -271,14 +286,14 @@ export const purchaseMarketItem = onCall(
 
       throw new HttpsError(
         "internal",
-        "Purchase failed: " + (err?.message ?? String(err)),
+        "Purchase failed: " + (err?.message ?? String(err))
       );
     }
-  },
+  }
 );
 
 // ====================================================================
-// 4) 마켓 아이템 등록 (Callable, v2)
+// 4) 마켓 아이템 생성 (Callable)
 // ====================================================================
 export const createMarketItem = onCall(
   { region: "asia-northeast3" },
@@ -288,9 +303,22 @@ export const createMarketItem = onCall(
       throw new HttpsError("unauthenticated", "Login required.");
     }
 
-    const diaryId: string = request.data?.diaryId ?? "";
-    const price: number = request.data?.price ?? 0;
-    const ownerName: string = request.data?.ownerName ?? "";
+    const diaryId: string = (request.data?.diaryId || "").trim();
+    const price: number = Number(request.data?.price ?? 0);
+    const ownerName: string = (request.data?.ownerName || "").trim();
+
+    // 추가 메타데이터
+    const content: string = (request.data?.content || "").trim();
+    const summary: string | null =
+      (request.data?.summary || "").trim() || null;
+    const interpretation: string | null =
+      (request.data?.interpretation || "").trim() || null;
+    const imageUrl: string | null =
+      (request.data?.imageUrl || "").trim() || null;
+
+    // 클라이언트에서 ISO 문자열로 보내는 날짜
+    const rawDate: string | null =
+      (request.data?.date || "").trim() || null;
 
     if (!diaryId) {
       throw new HttpsError("invalid-argument", "Missing diaryId");
@@ -299,6 +327,16 @@ export const createMarketItem = onCall(
     const id = `${diaryId}_${Date.now()}`;
     const now = FieldValue.serverTimestamp();
 
+    // date 필드: 있으면 그대로 Date, 없으면 now 기반
+    let dateField: admin.firestore.Timestamp | admin.firestore.FieldValue =
+      now;
+    if (rawDate) {
+      const parsed = new Date(rawDate);
+      if (!isNaN(parsed.getTime())) {
+        dateField = admin.firestore.Timestamp.fromDate(parsed);
+      }
+    }
+
     await db.collection("market_items").doc(id).set({
       id,
       diaryId,
@@ -306,12 +344,26 @@ export const createMarketItem = onCall(
       ownerName,
       price,
       status: "listed",
+      isSold: false,
+      // ShopItem 이 참고하는 필드들
+      content,
+      summary,
+      interpretation,
+      imageUrl,
+      date: dateField,
+      // 상태 필드
+      buyerUid: null,
       createdAt: now,
       updatedAt: now,
     });
 
-    logger.info("Market item created", { id, diaryId, uid, price });
+    logger.info("createMarketItem success", {
+      id,
+      diaryId,
+      sellerUid: uid,
+      price,
+    });
 
     return { id };
-  },
+  }
 );
