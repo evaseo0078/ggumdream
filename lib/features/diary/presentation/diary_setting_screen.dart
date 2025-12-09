@@ -7,7 +7,7 @@ import 'package:intl/intl.dart';
 import '../../../widgets/app_toolbar.dart';
 import '../application/user_provider.dart';
 import '../data/purchase_repository.dart';
-import 'shop_diary_detail_screen.dart';
+import 'shop_detail_screen.dart';
 import '../../shop/domain/shop_item.dart';
 
 final purchaseHistoryProvider =
@@ -95,7 +95,7 @@ class DiarySettingScreen extends ConsumerWidget {
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => ShopDiaryDetailScreen(item: entry),
+                              builder: (_) => ShopDetailScreen(item: entry),
                             ),
                           );
                         },

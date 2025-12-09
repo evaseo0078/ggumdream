@@ -1,3 +1,5 @@
+// lib/features/diary/application/user_provider.dart
+
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -32,8 +34,8 @@ class UserState {
           'Dreamer',
       userId: uid,
       coins: (data['coins'] is num) ? (data['coins'] as num).toInt() : 0,
-      purchaseHistory: [],
-      salesHistory: [],
+      purchaseHistory: const [],
+      salesHistory: const [],
     );
   }
 
@@ -79,7 +81,9 @@ class UserNotifier extends StateNotifier<UserState> {
   CollectionReference<Map<String, dynamic>> get _users =>
       _firestore.collection('users');
 
-  // ✅ 핵심: 문서 없으면 자동 생성 + 1000 코인 보정
+  // ---------------------------------------------------------------------------
+  // 유저 정보 로드 (문서 없으면 생성)
+  // ---------------------------------------------------------------------------
   Future<void> _loadUser() async {
     if (!mounted) return;
 
@@ -90,12 +94,15 @@ class UserNotifier extends StateNotifier<UserState> {
     final doc = await docRef.get();
 
     if (!doc.exists) {
-      await docRef.set({
-        'nickname': _auth.currentUser?.email ?? 'Dreamer',
-        'email': _auth.currentUser?.email,
-        'profileImageIndex': 1,
-        'createdAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      await docRef.set(
+        {
+          'nickname': _auth.currentUser?.email ?? 'Dreamer',
+          'email': _auth.currentUser?.email,
+          'profileImageIndex': 1,
+          'createdAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
     }
 
     final fresh = await docRef.get();
@@ -105,6 +112,22 @@ class UserNotifier extends StateNotifier<UserState> {
   }
 
   Future<void> refresh() async => _loadUser();
+
+  // ---------------------------------------------------------------------------
+  // 코어 상태 업데이트 유틸
+  // ---------------------------------------------------------------------------
+
+  /// 코인 값을 절대값으로 세팅 (필요시 서버에서 읽어온 값 반영용)
+  void setCoins(int coins) {
+    state = state.copyWith(coins: coins);
+  }
+
+  /// 코인을 amount 만큼 로컬 상태에서만 차감 (Cloud Functions 성공 후 호출)
+  void decreaseCoins(int amount) {
+    if (amount <= 0) return;
+    final newBalance = state.coins - amount;
+    state = state.copyWith(coins: newBalance);
+  }
 
   Future<void> setUser({
     required String username,
@@ -122,19 +145,14 @@ class UserNotifier extends StateNotifier<UserState> {
     );
   }
 
+  /// 구매 전에 "잔액이 충분한지"만 체크 (실제 차감은 Cloud Functions 담당)
   Future<bool> spendCoins(int amount) async {
     if (amount <= 0) return true;
     if (state.coins < amount) return false;
-
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return false;
-
-    final newBalance = state.coins - amount;
-    await _users.doc(uid).set({'coins': newBalance}, SetOptions(merge: true));
-    state = state.copyWith(coins: newBalance, userId: uid);
     return true;
   }
 
+  /// 보상/수익 등으로 코인 추가 (이건 서버/클라 둘 다 업데이트)
   Future<void> earnCoins(int amount) async {
     if (amount <= 0) return;
 
@@ -142,11 +160,18 @@ class UserNotifier extends StateNotifier<UserState> {
     if (uid == null) return;
 
     final newBalance = state.coins + amount;
-    await _users.doc(uid).set({'coins': newBalance}, SetOptions(merge: true));
+    await _users.doc(uid).set(
+      {'coins': newBalance},
+      SetOptions(merge: true),
+    );
     state = state.copyWith(coins: newBalance, userId: uid);
   }
 
-  // Purchase an item
+  // ---------------------------------------------------------------------------
+  // 구매 / 판매 기록 (필요하면 사용)
+  // ---------------------------------------------------------------------------
+
+  // Purchase an item (로컬 기록용 – 현재 코인 차감은 Cloud Functions + decreaseCoins 로 처리)
   bool purchaseItem(ShopItem item) {
     if (state.coins < item.price) return false;
 
@@ -179,22 +204,7 @@ class UserNotifier extends StateNotifier<UserState> {
   void updateSalePrice(String diaryId, int newPrice) {
     final newSalesHistory = state.salesHistory.map((item) {
       if (item.diaryId == diaryId) {
-        return ShopItem(
-          id: item.id,
-          diaryId: item.diaryId,
-          sellerUid: item.sellerUid,
-          ownerName: item.ownerName,
-          date: item.date,
-          content: item.content,
-          price: newPrice,
-          summary: item.summary,
-          interpretation: item.interpretation,
-          imageUrl: item.imageUrl,
-          buyerUid: item.buyerUid,
-          isSold: item.isSold,
-          createdAt: item.createdAt,
-          purchasedAt: item.purchasedAt,
-        );
+        return item.copyWith(price: newPrice);
       }
       return item;
     }).toList();
@@ -207,9 +217,13 @@ class UserNotifier extends StateNotifier<UserState> {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
 
-    await _users.doc(uid).set({
-      'nickname': state.username,
-    }, SetOptions(merge: true));
+    await _users.doc(uid).set(
+      {
+        'nickname': state.username,
+        // coins 는 Cloud Functions / earnCoins 가 관리
+      },
+      SetOptions(merge: true),
+    );
   }
 
   @override

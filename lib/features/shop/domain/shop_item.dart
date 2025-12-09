@@ -69,6 +69,7 @@ class ShopItem {
     );
   }
 
+  /// Firestore에 저장할 때: status / isSold 둘 다 기록
   Map<String, dynamic> toFirestore() {
     return {
       'diaryId': diaryId,
@@ -82,8 +83,12 @@ class ShopItem {
       'imageUrl': imageUrl,
       'buyerUid': buyerUid,
       'isSold': isSold,
-      'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
-      if (purchasedAt != null) 'purchasedAt': Timestamp.fromDate(purchasedAt!),
+      'status': isSold ? 'sold' : 'listed',
+      'createdAt': createdAt != null
+          ? Timestamp.fromDate(createdAt!)
+          : FieldValue.serverTimestamp(),
+      if (purchasedAt != null)
+        'purchasedAt': Timestamp.fromDate(purchasedAt!),
     };
   }
 
@@ -94,8 +99,28 @@ class ShopItem {
         final parsed = DateTime.tryParse(value);
         if (parsed != null) return parsed;
       }
+      // null이면 지금 시각으로 fallback
       return DateTime.now();
     }
+
+    bool parseIsSold(Map<String, dynamic> d) {
+      // 1) isSold 필드가 있으면 우선
+      final dynamic raw = d['isSold'];
+      if (raw is bool) return raw;
+
+      // 2) status 필드(string) 있는 경우
+      final status = d['status'];
+      if (status is String) {
+        // listed 이외 값(sold, cancelled 등)은 모두 팔린 것으로 간주
+        return status != 'listed';
+      }
+
+      // 3) 둘 다 없으면 기본값 false
+      return false;
+    }
+
+    // purchasedAt: 없고 soldAt만 있는 경우도 함께 처리
+    final purchasedAtRaw = data['purchasedAt'] ?? data['soldAt'];
 
     return ShopItem(
       id: id,
@@ -109,10 +134,11 @@ class ShopItem {
       interpretation: data['interpretation'] as String?,
       imageUrl: data['imageUrl'] as String?,
       buyerUid: data['buyerUid'] as String?,
-      isSold: data['isSold'] as bool? ?? false,
-      createdAt: data['createdAt'] != null ? parseDate(data['createdAt']) : null,
+      isSold: parseIsSold(data),
+      createdAt:
+          data['createdAt'] != null ? parseDate(data['createdAt']) : null,
       purchasedAt:
-          data['purchasedAt'] != null ? parseDate(data['purchasedAt']) : null,
+          purchasedAtRaw != null ? parseDate(purchasedAtRaw) : null,
     );
   }
 }

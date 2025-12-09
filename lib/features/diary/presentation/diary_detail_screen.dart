@@ -8,6 +8,8 @@ import 'package:intl/intl.dart';
 
 import '../domain/diary_entry.dart';
 import '../application/diary_providers.dart';
+import '../application/shop_provider.dart';      // ⭐ 수정: 추가
+import '../application/user_provider.dart';      // ⭐ 수정: 추가
 import '../../../shared/widgets/full_screen_image_viewer.dart';
 import 'diary_editor_screen.dart';
 
@@ -372,11 +374,45 @@ class DiaryDetailScreen extends ConsumerWidget {
   }
 
   void _confirmDelete(BuildContext context, WidgetRef ref, String entryId) {
+    // ⭐ 수정: 판매 중인 일기인지 먼저 확인
+    final shopItems = ref.read(shopProvider);
+    final currentUsername = ref.read(userProvider).username;
+
+    final bool isListed = shopItems.any(
+      (item) =>
+          item.diaryId == entryId &&
+          item.ownerName == currentUsername &&
+          !item.isSold,
+    );
+
+    if (isListed) {
+      // 판매중인 일기는 삭제 불가
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text("Cannot Delete"),
+          content: const Text(
+            "This diary is currently listed for sale. "
+            "Please cancel the sale first and try again.",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // ⭐ 기존 삭제 동작 (판매 중이 아닐 때만)
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text("Delete Diary"),
-        content: const Text("Are you sure you want to delete this diary entry?"),
+        content:
+            const Text("Are you sure you want to delete this diary entry?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
