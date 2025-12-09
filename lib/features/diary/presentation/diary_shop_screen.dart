@@ -269,18 +269,16 @@ class _DiaryShopScreenState extends ConsumerState<DiaryShopScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            alignment: Alignment.centerLeft,
-                            height: 40,
-                            child: Text(
-                              item.summary ?? "Summary hidden",
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                decoration: item.isSold ? TextDecoration.lineThrough : null,
-                              ),
+                          Text(
+                            item.summary ?? "Summary hidden",
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.3,
+                              decoration: item.isSold ? TextDecoration.lineThrough : null,
                             ),
                           ),
                           const SizedBox(height: 8),

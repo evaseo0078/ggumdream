@@ -1216,6 +1216,40 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     WidgetRef ref,
     String entryId,
   ) {
+    // 판매중인 일기인지 확인
+    final shopItems = ref.read(shopProvider);
+    final currentUsername = ref.read(userProvider).username;
+    
+    final isListed = shopItems.any(
+      (item) =>
+          item.diaryId == entryId &&
+          item.ownerName == currentUsername &&
+          !item.isSold,
+    );
+
+    if (isListed) {
+      // 판매중인 일기는 삭제 불가
+      showDialog(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text("Cannot Delete"),
+            content: const Text(
+              "This diary is currently listed for sale. Please cancel the sale first and try again.",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text("OK"),
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
+
+    // 판매중이 아니면 삭제 확인 다이얼로그 표시
     showDialog(
       context: context,
       builder: (dialogContext) {
