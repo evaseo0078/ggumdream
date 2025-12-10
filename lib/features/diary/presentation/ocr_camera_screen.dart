@@ -90,8 +90,18 @@ class _OcrCameraScreenState extends ConsumerState<OcrCameraScreen> {
 
   void _showError(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red),
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Error', style: TextStyle(color: Colors.red)),
+          content: const Text('Failed to recognize text. Please try capturing again.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
       );
     }
   }
