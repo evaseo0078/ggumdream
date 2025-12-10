@@ -76,19 +76,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
 
     // ---------------------------
     // 2) Sleep Period Chart
-    //
-    // ✅ 너가 싫어한 현상 해결 포인트:
-    //    "전날 23~24가 오늘에 그어지는 문제"
-    //
-    // => Stats에서는 "기상일 기준"이 아니라
-    //    "캘린더 날짜 기준으로 interval을 쪼개서" 붙인다.
-    //
-    // 예)
-    // 12/6에 23~07 입력되어 실제 저장이
-    // 12/5 23:00 ~ 12/6 07:00 이면
-    //
-    // 12/5 막대: 23~24
-    // 12/6 막대: 00~07
+    //    - 캘린더 날짜 기준 막대 (7일)
     // ---------------------------
     final todayKey = _dateOnly(now);
     final last7Days = _lastNDays(todayKey, 7); // 오래된 → 최신
@@ -98,16 +86,32 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       last7Days,
     );
 
-    final dailyDurations = last7Days.map((d) {
-      final key = _dateOnly(d);
-      return _sumSleepDurationForCalendarDay(intervalsByDay, key);
-    }).toList();
+    // ---------------------------
+    // 3) Average Sleep (7D)
+    //
+    // ✅ 요구 사항:
+    //   - "최근 7일 중, 수면 등록된 날 기준"
+    //   - 7일 23:00 ~ 8일 07:00 이면
+    //     → 7일 막대에는 23~24가 보이더라도
+    //       평균 계산은 8일 8h로만 카운트
+    //
+    //   => DiaryEntry.date (기상일) 기준으로
+    //      밤 하나를 한 날짜에만 귀속
+    // ---------------------------
+    final durationByDreamDay = _sleepDurationByDreamDay(
+      diaryList,
+      last7Days,
+    );
 
     double avgSleep7 = 0;
-    final nonZeroTotals = dailyDurations.where((v) => v > 0).toList();
-    if (nonZeroTotals.isNotEmpty) {
-      final sum = nonZeroTotals.fold<double>(0, (a, b) => a + b);
-      avgSleep7 = sum / nonZeroTotals.length;
+    final durationValues = last7Days
+        .map((d) => durationByDreamDay[_dateOnly(d)] ?? 0.0)
+        .where((v) => v > 0)
+        .toList();
+
+    if (durationValues.isNotEmpty) {
+      final sum = durationValues.fold<double>(0, (a, b) => a + b);
+      avgSleep7 = sum / durationValues.length;
     }
 
     return Scaffold(
@@ -171,7 +175,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                               totalDreams == 0
                                   ? "Nightmares: 0.0%"
                                   : "Nightmares: ${(nightmareCount / totalDreams * 100).toStringAsFixed(1)}%",
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 6),
                             Text(
@@ -184,7 +189,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                             const SizedBox(height: 12),
                             Row(
                               children: [
-                                _legendDot(const Color.fromARGB(255, 94, 82, 82)),
+                                _legendDot(const Color.fromARGB(
+                                    255, 94, 82, 82)),
                                 const SizedBox(width: 6),
                                 const Text("Nightmare (😢, 😡, 😱)"),
                               ],
@@ -210,8 +216,11 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                             sections: [
                               PieChartSectionData(
                                 value: nightmareCount.toDouble(),
-                                color: const Color.fromARGB(255, 94, 82, 82),
-                                title: nightmareCount == 0 ? '' : '$nightmareCount',
+                                color:
+                                    const Color.fromARGB(255, 94, 82, 82),
+                                title: nightmareCount == 0
+                                    ? ''
+                                    : '$nightmareCount',
                                 radius: 50,
                                 titleStyle: const TextStyle(
                                   fontSize: 16,
@@ -222,7 +231,9 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                               PieChartSectionData(
                                 value: normalCount.toDouble(),
                                 color: const Color(0xFFAABCC5),
-                                title: normalCount == 0 ? '' : '$normalCount',
+                                title: normalCount == 0
+                                    ? ''
+                                    : '$normalCount',
                                 radius: 50,
                                 titleStyle: const TextStyle(
                                   fontSize: 16,
@@ -260,7 +271,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                       const SizedBox(height: 4),
                       const Text(
                         "Last 7 days (range view)",
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                        style:
+                            TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                       const SizedBox(height: 16),
                       SizedBox(
@@ -354,7 +366,9 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         if (seg.end <= seg.start) continue;
 
         if (seg.start > cursor) {
-          stacks.add(BarChartRodStackItem(cursor, seg.start, Colors.transparent));
+          stacks.add(
+            BarChartRodStackItem(cursor, seg.start, Colors.transparent),
+          );
         }
 
         stacks.add(
@@ -369,7 +383,9 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       }
 
       if (cursor < _maxY) {
-        stacks.add(BarChartRodStackItem(cursor, _maxY, Colors.transparent));
+        stacks.add(
+          BarChartRodStackItem(cursor, _maxY, Colors.transparent),
+        );
       }
 
       return BarChartGroupData(
@@ -389,19 +405,16 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       BarChartData(
         minY: _minY,
         maxY: _maxY,
-
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
           getDrawingHorizontalLine: (value) =>
               FlLine(color: Colors.white24, strokeWidth: 1),
         ),
-
         borderData: FlBorderData(
           show: true,
           border: Border.all(color: Colors.white24),
         ),
-
         titlesData: FlTitlesData(
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
@@ -443,9 +456,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
             sideTitles: SideTitles(showTitles: false),
           ),
         ),
-
         barGroups: groups,
-
         barTouchData: BarTouchData(
           enabled: true,
           touchTooltipData: BarTouchTooltipData(
@@ -479,9 +490,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   }
 
   // -----------------------------------------------------
-  // ✅ 핵심 변경: 캘린더 날짜 기준 수면 구간 집계
-  // - sleepStartAt/sleepEndAt 기반
-  // - 자정 넘기면 실제 날짜로 2개로 나눠서 각 날짜에 배치
+  // ✅ 캘린더 날짜 기준 수면 구간 집계 (그래프용)
   // -----------------------------------------------------
   Map<DateTime, List<({double start, double end})>> _sleepIntervalsByCalendarDay(
     List<DiaryEntry> entries,
@@ -502,7 +511,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       final sHour = _hourOfDay(sAt);
       final eHour = _hourOfDay(eAt);
 
-      // ✅ 같은 날짜면 그대로
+      // 같은 날짜면 그대로
       if (sKey == eKey) {
         if (map.containsKey(sKey)) {
           map[sKey]!.add((start: sHour, end: eHour));
@@ -510,13 +519,11 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         continue;
       }
 
-      // ✅ 자정 넘김: 2조각으로 분할
-      // 1) 시작 날짜: sHour ~ 24
+      // 자정 넘김: 2조각으로 분할
       if (map.containsKey(sKey)) {
         map[sKey]!.add((start: sHour, end: _maxY));
       }
 
-      // 2) 종료 날짜: 0 ~ eHour
       if (map.containsKey(eKey)) {
         map[eKey]!.add((start: _minY, end: eHour));
       }
@@ -526,26 +533,48 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   }
 
   // -----------------------------------------------------
-  // ✅ intervalsByDay 기반 "그 날짜" 수면 총합
+  // ✅ 평균 계산용: DiaryEntry.date(기상일) 기준 총 수면시간
+  //
+  // - last7Days 안에 포함되는 기상일만 map에 포함
+  // - 7일 23:00 ~ 8일 07:00 이면
+  //   → diary.date 가 8일이라고 가정
+  //   → 8일 key에 8시간만 기록
   // -----------------------------------------------------
-  double _sumSleepDurationForCalendarDay(
-    Map<DateTime, List<({double start, double end})>> intervalsByDay,
-    DateTime dayKey,
+  Map<DateTime, double> _sleepDurationByDreamDay(
+    List<DiaryEntry> entries,
+    List<DateTime> days,
   ) {
-    final intervals = intervalsByDay[dayKey] ?? const [];
-    double sum = 0.0;
+    final allowedDays = {
+      for (final d in days) _dateOnly(d),
+    };
 
-    for (final itv in intervals) {
-      final s = itv.start;
-      final e = itv.end;
-      if (e > s) sum += (e - s);
+    final map = <DateTime, double>{
+      for (final d in allowedDays) d: 0.0,
+    };
+
+    for (final e in entries) {
+      final sAt = e.sleepStartAt;
+      final eAt = e.sleepEndAt;
+      if (sAt == null || eAt == null) continue;
+
+      // 기상일(다이어리 날짜) 기준
+      final dreamDayKey = _dateOnly(e.date);
+      if (!allowedDays.contains(dreamDayKey)) continue;
+
+      final diffMinutes = eAt.difference(sAt).inMinutes;
+      if (diffMinutes <= 0) continue;
+
+      final hours = diffMinutes / 60.0;
+      final clamped = hours.clamp(0.0, 24.0).toDouble();
+
+      map[dreamDayKey] = (map[dreamDayKey] ?? 0.0) + clamped;
     }
 
-    return sum;
+    return map;
   }
 
   // -----------------------------------------------------
-  // ✅ day helpers (calendar 기준)
+  // day helpers (calendar 기준)
   // -----------------------------------------------------
   List<DateTime> _lastNDays(DateTime todayKey, int n) {
     return List.generate(
@@ -557,7 +586,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
   // -----------------------------------------------------
-  // ✅ 시간 helpers
+  // 시간 helpers
   // -----------------------------------------------------
   double _hourOfDay(DateTime dt) => dt.hour + dt.minute / 60.0;
 
