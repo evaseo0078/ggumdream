@@ -8,8 +8,8 @@ import 'package:intl/intl.dart';
 
 import '../domain/diary_entry.dart';
 import '../application/diary_providers.dart';
-import '../application/shop_provider.dart';      // ⭐ 수정: 추가
-import '../application/user_provider.dart';      // ⭐ 수정: 추가
+import '../application/shop_provider.dart'; // ⭐ 수정: 추가
+import '../application/user_provider.dart'; // ⭐ 수정: 추가
 import '../../../shared/widgets/full_screen_image_viewer.dart';
 import 'diary_editor_screen.dart';
 
@@ -151,6 +151,63 @@ class DiaryDetailScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.edit, color: Colors.white),
             onPressed: () {
+              // 편집 전 판매 상태 확인
+              final shopItems = ref.read(shopProvider);
+              final currentUsername = ref.read(userProvider).username;
+
+              // 일치하는 판매 항목 찾기
+              var matching = shopItems.where(
+                (item) =>
+                    item.diaryId == e.id && item.ownerName == currentUsername,
+              );
+
+              bool isListed = false;
+              bool isSold = false;
+              if (matching.isNotEmpty) {
+                final item = matching.first;
+                isSold = item.isSold;
+                isListed = !item.isSold;
+              }
+
+              if (isListed) {
+                showDialog(
+                  context: context,
+                  builder: (dialogContext) => AlertDialog(
+                    title: const Text("Cannot Modify."),
+                    content: const Text(
+                      "This diary is currently listed for sale. Please cancel the sale first and try again.",
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext),
+                        child: const Text("OK"),
+                      ),
+                    ],
+                  ),
+                );
+                return;
+              }
+
+              if (isSold) {
+                showDialog(
+                  context: context,
+                  builder: (dialogContext) => AlertDialog(
+                    title: const Text("Cannot Modify."),
+                    content: const Text(
+                      "This diary has already been sold, so it cannot be modified.",
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext),
+                        child: const Text("OK"),
+                      ),
+                    ],
+                  ),
+                );
+                return;
+              }
+
+              // 편집 가능
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -378,12 +435,16 @@ class DiaryDetailScreen extends ConsumerWidget {
     final shopItems = ref.read(shopProvider);
     final currentUsername = ref.read(userProvider).username;
 
-    final bool isListed = shopItems.any(
-      (item) =>
-          item.diaryId == entryId &&
-          item.ownerName == currentUsername &&
-          !item.isSold,
+    final matching = shopItems.where(
+      (item) => item.diaryId == entryId && item.ownerName == currentUsername,
     );
+    bool isListed = false;
+    bool isSold = false;
+    if (matching.isNotEmpty) {
+      final item = matching.first;
+      isSold = item.isSold;
+      isListed = !item.isSold;
+    }
 
     if (isListed) {
       // 판매중인 일기는 삭제 불가
@@ -394,6 +455,26 @@ class DiaryDetailScreen extends ConsumerWidget {
           content: const Text(
             "This diary is currently listed for sale. "
             "Please cancel the sale first and try again.",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (isSold) {
+      // 이미 판매된 일기는 삭제 불가
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text("Cannot Delete"),
+          content: const Text(
+            "This diary has already been sold and cannot be deleted.",
           ),
           actions: [
             TextButton(

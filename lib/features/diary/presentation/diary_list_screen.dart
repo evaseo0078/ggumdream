@@ -113,15 +113,14 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
 
     // ✅ 캘린더 모드 + 날짜 선택 시:
     // "sleepEndAt 우선" 캘린더 기준으로 필터링
-    final displayList =
-        (_viewMode == ViewMode.calendar && _selectedDay != null)
-            ? diaryList
-                .where((entry) => isSameDay(
-                      _calendarDayKey(entry),
-                      _selectedDay,
-                    ))
-                .toList()
-            : diaryList;
+    final displayList = (_viewMode == ViewMode.calendar && _selectedDay != null)
+        ? diaryList
+            .where((entry) => isSameDay(
+                  _calendarDayKey(entry),
+                  _selectedDay,
+                ))
+            .toList()
+        : diaryList;
 
     return Scaffold(
       body: Stack(
@@ -345,8 +344,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                                       ...displayMoods.map(
                                         (mood) => Text(
                                           mood,
-                                          style:
-                                              const TextStyle(fontSize: 10),
+                                          style: const TextStyle(fontSize: 10),
                                         ),
                                       ),
                                       if (hasMore)
@@ -375,8 +373,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                   SliverFillRemaining(
                     child: Center(
                       child: Text(
-                        _viewMode == ViewMode.calendar &&
-                                _selectedDay != null
+                        _viewMode == ViewMode.calendar && _selectedDay != null
                             ? "No dreams on this day.\nTap + to write!"
                             : "Let's make your\nfirst post",
                         textAlign: TextAlign.center,
@@ -1167,92 +1164,89 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     );
   }
 
-      void _registerToShop(
-        BuildContext context,
-        WidgetRef ref,
-        DiaryEntry entry,
-        int price,
-      ) async {
-        try {
-          final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
-          if (currentUser == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Please log in first")),
-            );
-            return;
-          }
-
-          final username = ref.read(userProvider).username;
-
-          // ✅ asia-northeast3 리전에 있는 Cloud Functions 인스턴스 사용
-          final FirebaseFunctions functions =
-              FirebaseFunctions.instanceFor(region: 'asia-northeast3');
-
-          // ✅ onCall 이름 그대로
-          final HttpsCallable callable =
-              functions.httpsCallable('createMarketItem');
-
-          // ✅ 서버에 마켓 아이템 생성 요청 (메타데이터 모두 포함)
-          final HttpsCallableResult result =
-              await callable.call(<String, dynamic>{
-            'diaryId': entry.id,
-            'price': price,
-            'ownerName': username,
-            // 추가 메타데이터
-            'content': entry.content,
-            'summary': entry.summary,
-            'interpretation': entry.interpretation,
-            'imageUrl': entry.imageUrl,
-            'date': entry.date.toIso8601String(),
-          });
-
-          final data = result.data as Map<dynamic, dynamic>;
-          final String marketItemId = data['id'] as String;
-
-          // ✅ 앱 내부 상태에도 새 ShopItem 반영
-          final newItem = ShopItem(
-            id: marketItemId,
-            diaryId: entry.id,
-            sellerUid: currentUser.uid,
-            ownerName: username,
-            date: entry.date,
-            content: entry.content,
-            price: price,
-            summary: entry.summary,
-            interpretation: entry.interpretation,
-            imageUrl: entry.imageUrl,
-            buyerUid: null,
-            isSold: false,
-            createdAt: DateTime.now(),
-            purchasedAt: null,
-          );
-
-          // shopProvider 쪽에 addOrUpdate 같은 메서드가 있다면 사용
-          ref.read(shopProvider.notifier).addOrUpdate(newItem);
-
-          // 일기 리스트에서도 판매중 상태로
-          ref.read(diaryListProvider.notifier).setSellStatus(entry.id, true);
-
-          // 유저 정보(내 판매 목록, 통계 등) 업데이트
-          ref.read(userProvider.notifier).recordSale(newItem);
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Registered for $price coins!")),
-          );
-        } on FirebaseFunctionsException catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Failed to register: ${e.code} ${e.message}"),
-            ),
-          );
-        } catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Failed to register: $e")),
-          );
-        }
+  void _registerToShop(
+    BuildContext context,
+    WidgetRef ref,
+    DiaryEntry entry,
+    int price,
+  ) async {
+    try {
+      final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please log in first")),
+        );
+        return;
       }
 
+      final username = ref.read(userProvider).username;
 
+      // ✅ asia-northeast3 리전에 있는 Cloud Functions 인스턴스 사용
+      final FirebaseFunctions functions =
+          FirebaseFunctions.instanceFor(region: 'asia-northeast3');
+
+      // ✅ onCall 이름 그대로
+      final HttpsCallable callable =
+          functions.httpsCallable('createMarketItem');
+
+      // ✅ 서버에 마켓 아이템 생성 요청 (메타데이터 모두 포함)
+      final HttpsCallableResult result = await callable.call(<String, dynamic>{
+        'diaryId': entry.id,
+        'price': price,
+        'ownerName': username,
+        // 추가 메타데이터
+        'content': entry.content,
+        'summary': entry.summary,
+        'interpretation': entry.interpretation,
+        'imageUrl': entry.imageUrl,
+        'date': entry.date.toIso8601String(),
+      });
+
+      final data = result.data as Map<dynamic, dynamic>;
+      final String marketItemId = data['id'] as String;
+
+      // ✅ 앱 내부 상태에도 새 ShopItem 반영
+      final newItem = ShopItem(
+        id: marketItemId,
+        diaryId: entry.id,
+        sellerUid: currentUser.uid,
+        ownerName: username,
+        date: entry.date,
+        content: entry.content,
+        price: price,
+        summary: entry.summary,
+        interpretation: entry.interpretation,
+        imageUrl: entry.imageUrl,
+        buyerUid: null,
+        isSold: false,
+        createdAt: DateTime.now(),
+        purchasedAt: null,
+      );
+
+      // shopProvider 쪽에 addOrUpdate 같은 메서드가 있다면 사용
+      ref.read(shopProvider.notifier).addOrUpdate(newItem);
+
+      // 일기 리스트에서도 판매중 상태로
+      ref.read(diaryListProvider.notifier).setSellStatus(entry.id, true);
+
+      // 유저 정보(내 판매 목록, 통계 등) 업데이트
+      ref.read(userProvider.notifier).recordSale(newItem);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Registered for $price coins!")),
+      );
+    } on FirebaseFunctionsException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to register: ${e.code} ${e.message}"),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to register: $e")),
+      );
+    }
+  }
 
   void _cancelSale(BuildContext context, WidgetRef ref, DiaryEntry entry) {
     ref.read(diaryListProvider.notifier).setSellStatus(entry.id, false);
@@ -1275,13 +1269,18 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
     // 판매중인 일기인지 확인
     final shopItems = ref.read(shopProvider);
     final currentUsername = ref.read(userProvider).username;
-    
-    final isListed = shopItems.any(
-      (item) =>
-          item.diaryId == entryId &&
-          item.ownerName == currentUsername &&
-          !item.isSold,
+
+    final matching = shopItems.where(
+      (item) => item.diaryId == entryId && item.ownerName == currentUsername,
     );
+
+    bool isListed = false;
+    bool isSold = false;
+    if (matching.isNotEmpty) {
+      final item = matching.first;
+      isSold = item.isSold;
+      isListed = !item.isSold;
+    }
 
     if (isListed) {
       // 판매중인 일기는 삭제 불가
@@ -1292,6 +1291,28 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
             title: const Text("Cannot Delete"),
             content: const Text(
               "This diary is currently listed for sale. Please cancel the sale first and try again.",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text("OK"),
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
+
+    if (isSold) {
+      // 이미 판매된 일기는 삭제 불가
+      showDialog(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text("Cannot Delete"),
+            content: const Text(
+              "This diary has already been sold and cannot be deleted.",
             ),
             actions: [
               TextButton(
