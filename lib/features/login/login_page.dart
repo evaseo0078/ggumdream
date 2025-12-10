@@ -34,6 +34,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   // -----------------------------
+  // Whitespace check
+  // -----------------------------
+  bool _containsWhitespace(String value) {
+    return RegExp(r'\s').hasMatch(value);
+  }
+
+  // -----------------------------
   // Two-message policy for auth failures
   // 1) invalid email format
   // 2) email or password incorrect
@@ -65,19 +72,31 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Future<void> _handleLogin() async {
     if (_isLoading) return;
 
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
+    // ⚠️ 공백 검사용: trim() 이전 원본 값
+    final rawEmail = _emailController.text;
+    final rawPassword = _passwordController.text;
 
-    // ✅ 시도할 때 기존 로컬 에러는 일단 제거
+    // 기존 로컬 에러 초기화
     _setLocalError(null);
 
     // -----------------------------
-    // UI-level validation (English)
+    // UI-level validation
     // -----------------------------
-    if (email.isEmpty || password.isEmpty) {
+    // 1) 비어 있는지
+    if (rawEmail.isEmpty || rawPassword.isEmpty) {
       _setLocalError('Please enter both email and password.');
       return;
     }
+
+    // 2) 공백 포함 여부 (예: "1234 " 도 에러)
+    if (_containsWhitespace(rawEmail) || _containsWhitespace(rawPassword)) {
+      _setLocalError('Email and password cannot contain spaces.');
+      return;
+    }
+
+    // 3) 형식/길이 검사는 trim 후 진행
+    final email = rawEmail.trim();
+    final password = rawPassword.trim();
 
     if (!_isValidEmail(email)) {
       _setLocalError('Invalid email format.');
@@ -201,7 +220,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
                         onChanged: (_) {
-                          // 입력 중엔 에러를 과하게 지우고 싶지 않으면 주석 가능
                           if (_localError != null) _setLocalError(null);
                         },
                         decoration: InputDecoration(
