@@ -72,9 +72,8 @@ class DiaryRepository {
   /// 🔹 현재 로그인 유저 기준으로 일기 1회 조회
   Future<List<DiaryEntry>> fetchDiaries() async {
     final uid = _requireUid();
-    final snapshot = await _diaryCollection(uid)
-        .orderBy('date', descending: true)
-        .get();
+    final snapshot =
+        await _diaryCollection(uid).orderBy('date', descending: true).get();
 
     return snapshot.docs
         .map((doc) => DiaryEntry.fromFirestore(doc.id, doc.data()))
@@ -89,8 +88,7 @@ class DiaryRepository {
     final uid = _requireUid();
 
     // DiaryEntry에서 만든 데이터에 ownerId를 강제로 덧붙여서 규칙 만족
-    final data = entry.toFirestore()
-      ..['ownerId'] = uid; // 🔑 rules와 일관성 유지
+    final data = entry.toFirestore()..['ownerId'] = uid; // 🔑 rules와 일관성 유지
 
     await _diaryCollection(uid)
         .doc(entry.id)
@@ -190,9 +188,8 @@ JSON format:
 }
 """;
 
-      final response = await model.generateContent([
-        Content.text("$systemPrompt\n\nUser's Dream: $content")
-      ]);
+      final response = await model.generateContent(
+          [Content.text("$systemPrompt\n\nUser's Dream: $content")]);
 
       print("Gemini 응답 원본: ${response.text}");
 
@@ -219,17 +216,14 @@ JSON format:
       // ---------------------------
       // 1) 안전하게 값 꺼내기
       // ---------------------------
-      final summary =
-          contentJson?['summary']?.toString() ?? "요약 실패";
+      final summary = contentJson?['summary']?.toString() ?? "요약 실패";
 
       final interpretation =
           contentJson?['interpretation']?.toString() ?? "해석 실패";
 
-      final rawCategory = (
-              contentJson?['mood_category']?.toString() ?? ''
-            )
-            .toLowerCase()
-            .trim();
+      final rawCategory = (contentJson?['mood_category']?.toString() ?? '')
+          .toLowerCase()
+          .trim();
 
       // 2) 카테고리를 이모지로 매핑 (없으면 confused 이모지)
       final moodEmoji =
@@ -244,8 +238,8 @@ JSON format:
       print("Gemini 분석 오류: $e");
       print("입력값: $content");
       return {
-        "summary": "분석에 실패했어요",
-        "interpretation": "잠시 후 다시 시도해주세요.",
+        "summary": "Analysis failed.",
+        "interpretation": "Please try again later.",
         "mood": _moodEmojiMap['confused'] ?? '🤔',
       };
     }
