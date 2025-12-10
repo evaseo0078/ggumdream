@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart'; // ← 추가: 글자 수 제한용
 import 'package:go_router/go_router.dart';
 import 'package:ggumdream/widgets/logo_particle_animation.dart';
 
@@ -21,6 +22,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   bool _isLoading = false;
   bool _isPasswordVisible = false;
+
+  // ✅ 길이 제한 상수 (최소 변경)
+  static const int _emailMax = 100;
+  static const int _passwordMax = 64;
 
   // ✅ UI에만 띄울 로컬 에러
   String? _localError;
@@ -98,13 +103,27 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final email = rawEmail.trim();
     final password = rawPassword.trim();
 
+    // 🔹 추가: 이메일 길이 상한 체크
+    if (email.length > _emailMax) {
+      _setLocalError('Email is too long.');
+      return;
+    }
+
+    // 기존 이메일 형식 체크
     if (!_isValidEmail(email)) {
       _setLocalError('Invalid email format.');
       return;
     }
 
+    // 🔹 기존 비밀번호 최소 길이 체크
     if (password.length < 6) {
       _setLocalError('Password must be at least 6 characters.');
+      return;
+    }
+
+    // 🔹 추가: 비밀번호 길이 상한 체크
+    if (password.length > _passwordMax) {
+      _setLocalError('Password is too long.');
       return;
     }
 
@@ -222,6 +241,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         onChanged: (_) {
                           if (_localError != null) _setLocalError(null);
                         },
+                        // 🔹 추가: 실제 입력 길이 제한
+                        inputFormatters: [
+                          LengthLimitingTextInputFormatter(_emailMax),
+                        ],
                         decoration: InputDecoration(
                           labelText: 'Email',
                           border: const OutlineInputBorder(
@@ -249,6 +272,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         onChanged: (_) {
                           if (_localError != null) _setLocalError(null);
                         },
+                        // 🔹 추가: 실제 입력 길이 제한
+                        inputFormatters: [
+                          LengthLimitingTextInputFormatter(_passwordMax),
+                        ],
                         decoration: InputDecoration(
                           labelText: 'Password',
                           border: const OutlineInputBorder(

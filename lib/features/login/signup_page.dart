@@ -1,6 +1,5 @@
-// lib/features/login/signup_page.dart
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // ← 글자 수 제한용
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +15,20 @@ class SignupPage extends ConsumerStatefulWidget {
 }
 
 class _SignupPageState extends ConsumerState<SignupPage> {
+  // ===== 길이 제한 상수 =====
+  static const int _nameMin = 1;
+  static const int _nameMax = 30;
+
+  static const int _nicknameMin = 2;
+  static const int _nicknameMax = 20;
+
+  static const int _emailMin = 5;
+  static const int _emailMax = 100;
+
+  static const int _passwordMin = 6;   // UI 문구와 맞추려고 6으로 둠
+  static const int _passwordMax = 64;
+
+  // ===== 컨트롤러 =====
   final _nameCtrl = TextEditingController();
   final _nicknameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
@@ -94,33 +107,53 @@ class _SignupPageState extends ConsumerState<SignupPage> {
   void _validateName() {
     final raw = _nameCtrl.text;
     String? error;
+
     if (raw.isEmpty) {
       error = 'Please enter your name.';
     } else if (_containsWhitespace(raw)) {
       error = 'Name cannot contain spaces.';
+    } else if (raw.length < _nameMin || raw.length > _nameMax) {
+      error = 'Name must be between $_nameMin and $_nameMax characters.';
     }
+
     setState(() => _nameErrorText = error);
   }
 
   void _validateNickname() {
     final raw = _nicknameCtrl.text;
     String? error;
+
     if (raw.isEmpty) {
       error = 'Please enter your nickname.';
     } else if (_containsWhitespace(raw)) {
       error = 'Nickname cannot contain spaces.';
+    } else if (raw.length < _nicknameMin || raw.length > _nicknameMax) {
+      error =
+          'Nickname must be between $_nicknameMin and $_nicknameMax characters.';
     }
+
     setState(() => _nicknameErrorText = error);
   }
 
   void _validateEmail() {
     final raw = _emailCtrl.text;
+    final value = raw.trim();
     String? error;
-    if (raw.isEmpty) {
+
+    if (value.isEmpty) {
       error = 'Please enter your email.';
-    } else if (_containsWhitespace(raw)) {
+    } else if (_containsWhitespace(value)) {
       error = 'Email cannot contain spaces.';
+    } else if (value.length < _emailMin || value.length > _emailMax) {
+      error = 'Email must be between $_emailMin and $_emailMax characters.';
+    } else {
+      // 간단한 이메일 형식 검증
+      final reg = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+      if (!reg.hasMatch(value)) {
+        error = 'Please enter a valid email address.';
+      }
     }
+
     setState(() => _emailErrorText = error);
   }
 
@@ -135,8 +168,10 @@ class _SignupPageState extends ConsumerState<SignupPage> {
       pwError = 'Please enter your password.';
     } else if (_containsWhitespace(rawPw)) {
       pwError = 'Password cannot contain spaces.';
-    } else if (rawPw.length < 6) {
-      pwError = 'Password must be at least 6 characters.';
+    } else if (rawPw.length < _passwordMin ||
+        rawPw.length > _passwordMax) {
+      pwError =
+          'Password must be between $_passwordMin and $_passwordMax characters.';
     }
 
     if (rawCheck.isEmpty) {
@@ -281,8 +316,9 @@ class _SignupPageState extends ConsumerState<SignupPage> {
       );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Sign up successful!')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sign up successful!')),
+      );
       context.go('/login');
     } on NicknameAlreadyUsedException {
       if (!mounted) return;
@@ -312,7 +348,8 @@ class _SignupPageState extends ConsumerState<SignupPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: const BackButton(color: Color.fromARGB(255, 216, 169, 255)),
+        leading:
+            const BackButton(color: Color.fromARGB(255, 216, 169, 255)),
         title: const Text(
           "Make your new Account",
           style: TextStyle(
@@ -346,8 +383,9 @@ class _SignupPageState extends ConsumerState<SignupPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SizedBox(
-                  height:
-                      kToolbarHeight + MediaQuery.of(context).padding.top + 20,
+                  height: kToolbarHeight +
+                      MediaQuery.of(context).padding.top +
+                      20,
                 ),
 
                 _buildLabel("Name"),
@@ -355,8 +393,8 @@ class _SignupPageState extends ConsumerState<SignupPage> {
                   controller: _nameCtrl,
                   focusNode: _nameFocus,
                   errorText: _nameErrorText,
+                  maxLength: _nameMax,
                   onChanged: (_) {
-                    // 입력 중이면 에러 미리 지우거나 유지하고 싶으면 여기 조절
                     if (_nameErrorText != null) {
                       setState(() => _nameErrorText = null);
                     }
@@ -373,6 +411,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
                         controller: _nicknameCtrl,
                         focusNode: _nicknameFocus,
                         errorText: _nicknameErrorText,
+                        maxLength: _nicknameMax,
                         onChanged: (val) {
                           if (_isNicknameChecked) {
                             setState(() => _isNicknameChecked = false);
@@ -420,6 +459,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
                         focusNode: _emailFocus,
                         keyboardType: TextInputType.emailAddress,
                         errorText: _emailErrorText,
+                        maxLength: _emailMax,
                         onChanged: (val) {
                           if (_isEmailChecked) {
                             setState(() => _isEmailChecked = false);
@@ -473,6 +513,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
                   controller: _passwordCtrl,
                   focusNode: _passwordFocus,
                   obscureText: !_isPasswordVisible,
+                  maxLength: _passwordMax,
                   suffixIcon: IconButton(
                     icon: Icon(
                       _isPasswordVisible
@@ -502,6 +543,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
                   controller: _passwordCheckCtrl,
                   focusNode: _passwordCheckFocus,
                   obscureText: !_isPasswordCheckVisible,
+                  maxLength: _passwordMax,
                   suffixIcon: IconButton(
                     icon: Icon(
                       _isPasswordCheckVisible
@@ -554,6 +596,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
     Widget? suffixIcon,
     ValueChanged<String>? onChanged,
     String? errorText,
+    int? maxLength,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -570,6 +613,9 @@ class _SignupPageState extends ConsumerState<SignupPage> {
             obscureText: obscureText,
             keyboardType: keyboardType,
             onChanged: onChanged,
+            inputFormatters: maxLength != null
+                ? [LengthLimitingTextInputFormatter(maxLength)]
+                : null,
             decoration: InputDecoration(
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(

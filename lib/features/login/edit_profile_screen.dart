@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart'; // ← 추가: 글자 수 제한용
 import 'auth_repository.dart';
 import '../diary/application/user_provider.dart';
 
@@ -15,6 +16,16 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
+  // ===== 길이 제한 상수 =====
+  static const int _nameMin = 1;
+  static const int _nameMax = 30;
+
+  static const int _nicknameMin = 2;
+  static const int _nicknameMax = 20;
+
+  static const int _passwordMin = 6;
+  static const int _passwordMax = 64;
+
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _nicknameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
@@ -122,6 +133,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       err = 'Please enter your name';
     } else if (_containsWhitespace(rawName)) {
       err = 'Name cannot contain spaces';
+    } else if (rawName.length < _nameMin || rawName.length > _nameMax) {
+      err = 'Name must be between $_nameMin and $_nameMax characters';
     }
     setState(() => _nameError = err);
   }
@@ -133,6 +146,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       err = 'Please enter your nickname';
     } else if (_containsWhitespace(rawNickname)) {
       err = 'Nickname cannot contain spaces';
+    } else if (rawNickname.length < _nicknameMin ||
+        rawNickname.length > _nicknameMax) {
+      err = 'Nickname must be between $_nicknameMin and $_nicknameMax characters';
     }
     setState(() => _nicknameError = err);
   }
@@ -158,8 +174,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       // 새 비밀번호
       if (_containsWhitespace(rawNewPw)) {
         newPwError = 'New password cannot contain spaces';
-      } else if (rawNewPw.isNotEmpty && rawNewPw.length < 6) {
-        newPwError = 'Password must be at least 6 characters';
+      } else if (rawNewPw.isNotEmpty && rawNewPw.length < _passwordMin) {
+        newPwError = 'Password must be at least $_passwordMin characters';
+      } else if (rawNewPw.length > _passwordMax) {
+        newPwError =
+            'Password must be between $_passwordMin and $_passwordMax characters';
       }
 
       // 새 비밀번호 확인
@@ -212,6 +231,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (_containsWhitespace(newNickname)) {
       setState(() {
         _nicknameError = 'Nickname cannot contain spaces';
+      });
+      return;
+    }
+
+    if (newNickname.length < _nicknameMin || newNickname.length > _nicknameMax) {
+      setState(() {
+        _nicknameError =
+            'Nickname must be between $_nicknameMin and $_nicknameMax characters';
       });
       return;
     }
@@ -351,6 +378,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     } else if (_containsWhitespace(rawName)) {
       nameError = 'Name cannot contain spaces';
       hasError = true;
+    } else if (rawName.length < _nameMin || rawName.length > _nameMax) {
+      nameError = 'Name must be between $_nameMin and $_nameMax characters';
+      hasError = true;
     }
 
     // ✅ 닉네임 검증
@@ -359,6 +389,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       hasError = true;
     } else if (_containsWhitespace(rawNickname)) {
       nicknameError = 'Nickname cannot contain spaces';
+      hasError = true;
+    } else if (rawNickname.length < _nicknameMin ||
+        rawNickname.length > _nicknameMax) {
+      nicknameError =
+          'Nickname must be between $_nicknameMin and $_nicknameMax characters';
       hasError = true;
     }
 
@@ -400,8 +435,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       }
 
       // 길이 체크
-      if (rawNewPw.isNotEmpty && rawNewPw.length < 6) {
-        newPwError = 'Password must be at least 6 characters';
+      if (rawNewPw.isNotEmpty && rawNewPw.length < _passwordMin) {
+        newPwError = 'Password must be at least $_passwordMin characters';
+        hasError = true;
+      } else if (rawNewPw.length > _passwordMax) {
+        newPwError =
+            'Password must be between $_passwordMin and $_passwordMax characters';
         hasError = true;
       }
 
@@ -584,6 +623,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 onToggleVisibility: () {},
                 errorText: _nameError,
                 focusNode: _nameFocus,
+                maxLength: _nameMax,
                 onChanged: (_) {
                   if (_nameError != null) {
                     setState(() => _nameError = null);
@@ -609,6 +649,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           _nicknameError = null;
                         });
                       },
+                      inputFormatters: [
+                        LengthLimitingTextInputFormatter(_nicknameMax),
+                      ],
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: Colors.white,
@@ -678,6 +721,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 ),
                 errorText: _currentPasswordError,
                 focusNode: _currentPwFocus,
+                maxLength: _passwordMax,
                 onChanged: (_) {
                   if (_currentPasswordError != null) {
                     setState(() => _currentPasswordError = null);
@@ -708,6 +752,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 errorText: _newPasswordError,
                 readOnly: !_isCurrentVerified,
                 focusNode: _newPwFocus,
+                maxLength: _passwordMax,
                 onChanged: (_) {
                   if (_newPasswordError != null) {
                     setState(() => _newPasswordError = null);
@@ -726,6 +771,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 errorText: _confirmPasswordError,
                 readOnly: !_isCurrentVerified,
                 focusNode: _confirmPwFocus,
+                maxLength: _passwordMax,
                 onChanged: (_) {
                   if (_confirmPasswordError != null) {
                     setState(() => _confirmPasswordError = null);
@@ -758,6 +804,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     String? errorText,
     ValueChanged<String>? onChanged,
     FocusNode? focusNode,
+    int? maxLength, // ← 추가: 길이 제한
   }) {
     final isPasswordField = label.toLowerCase().contains("password");
     return Column(
@@ -774,6 +821,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           readOnly: readOnly,
           onTap: onTap,
           onChanged: onChanged,
+          inputFormatters: maxLength != null
+              ? [LengthLimitingTextInputFormatter(maxLength)]
+              : null,
           decoration: InputDecoration(
             filled: true,
             fillColor: Colors.white,
