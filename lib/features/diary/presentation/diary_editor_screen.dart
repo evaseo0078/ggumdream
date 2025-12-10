@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import 'package:cloud_functions/cloud_functions.dart'; // ✅ 추가: 코인 보상 Cloud Functions 호출용
 
 import '../../../shared/widgets/ggum_button.dart';
 import 'package:ggumdream/shared/widgets/wobbly_painter.dart';
@@ -272,7 +273,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     return null;
   }
 
-  // ───────────────── 저장 로직 ─────────────────
+  // ───────────────── 임시저장 ─────────────────
 
   Future<void> _saveDraft() async {
     final text = _textController.text.trim();
@@ -366,169 +367,188 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     );
   }
 
-    Future<void> _processAndSave() async {
-      final text = _textController.text.trim();
-      if (text.isEmpty) return;
+  /// ✅ Cloud Functions: rewardDiaryPost 호출해서 코인 +10 (서버에서 ledger 기록 포함)
+  Future<void> _rewardDiaryCoins(String diaryId) async {
+    try {
+      final functions =
+          FirebaseFunctions.instanceFor(region: 'asia-northeast3');
+      final callable = functions.httpsCallable('rewardDiaryPost');
 
-      const int minLength = 20;
-      if (text.length < minLength) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Too short! Please write at least $minLength chars."),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-        return;
+      await callable.call(<String, dynamic>{
+        'diaryId': diaryId,
+      });
+
+      // Firestore coins 갱신은 Cloud Functions가 하고,
+      // userProvider가 users/{uid}를 listen 중이라 UI는 자동으로 업데이트됨.
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('rewardDiaryPost error: $e');
       }
+      // 실패해도 앱 플로우는 계속. 필요하면 Snackbar로 안내해도 됨.
+    }
+  }
 
-      final isEditMode = widget.existingEntry != null;
-      // ✅ 기존 글이 draft였는지 여부 (임시저장 → 이번에 처음 확정 저장 구분용)
-      final bool wasDraft = widget.existingEntry?.isDraft ?? false;
+  // ───────────────── 게시/수정 + AI 분석 ─────────────────
 
-      final diaryDate = _diaryDateForSave(isEditMode: isEditMode);
+  Future<void> _processAndSave() async {
+    final text = _textController.text.trim();
+    if (text.isEmpty) return;
 
-      // ✅ 수면 시간 계산
-      DateTime? sAt;
-      DateTime? eAt;
-      double sleepHours = -1.0;
+    const int minLength = 20;
+    if (text.length < minLength) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Too short! Please write at least $minLength chars."),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
 
-      if (!_isSleepUnknown) {
-        final itv = _buildInterval(diaryDate);
-        sAt = itv.start;
-        eAt = itv.end;
-        sleepHours = _durationFromInterval(sAt, eAt);
-      }
+    final isEditMode = widget.existingEntry != null;
+    final diaryDate = _diaryDateForSave(isEditMode: isEditMode);
 
-      // ✅ POST 전 검증용 임시 엔트리
-      final tempEntryForValidation = DiaryEntry(
-        id: isEditMode ? widget.existingEntry!.id : "temp",
+    // ✅ 수면 시간 계산
+    DateTime? sAt;
+    DateTime? eAt;
+    double sleepHours = -1.0;
+
+    if (!_isSleepUnknown) {
+      final itv = _buildInterval(diaryDate);
+      sAt = itv.start;
+      eAt = itv.end;
+      sleepHours = _durationFromInterval(sAt, eAt);
+    }
+
+    // ✅ POST 전 검증용 엔트리
+    final tempEntryForValidation = DiaryEntry(
+      id: isEditMode ? widget.existingEntry!.id : "temp",
+      date: diaryDate,
+      content: text,
+      mood: isEditMode ? widget.existingEntry!.mood : "🌿",
+      sleepDuration: sleepHours,
+      sleepStartAt: sAt,
+      sleepEndAt: eAt,
+      isSold: isEditMode ? widget.existingEntry!.isSold : false,
+      isDraft: false,
+      imageUrl: isEditMode ? widget.existingEntry!.imageUrl : null,
+      summary: isEditMode ? widget.existingEntry!.summary : null,
+      interpretation:
+          isEditMode ? widget.existingEntry!.interpretation : null,
+    );
+
+    final allDiaries = ref.read(diaryListProvider);
+    final err = _validateSleepOnPost(
+      candidate: tempEntryForValidation,
+      all: allDiaries,
+    );
+
+    if (err != null) {
+      if (!mounted) return;
+      _showErrorDialog(err);
+      return;
+    }
+
+    // ✅ LLM 로딩
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: Color(0xFFAABCC5)),
+            SizedBox(height: 20),
+            Text(
+              "Re-Analyzing Dream...",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final llmService = ref.read(llmServiceProvider);
+
+      final results = await Future.wait([
+        llmService.generateImage(text),
+        llmService.analyzeDream(text),
+      ]);
+
+      final imageUrl = results[0] as String;
+      final analysis = results[1] as Map<String, String>;
+
+      final newEntry = DiaryEntry(
+        id: isEditMode ? widget.existingEntry!.id : const Uuid().v4(),
         date: diaryDate,
         content: text,
-        mood: isEditMode ? widget.existingEntry!.mood : "🌿",
+        imageUrl: imageUrl,
+        summary: analysis['summary'],
+        interpretation: analysis['interpretation'],
+        mood: analysis['mood'] ?? "🌿",
         sleepDuration: sleepHours,
         sleepStartAt: sAt,
         sleepEndAt: eAt,
+        isDraft: false,
         isSold: isEditMode ? widget.existingEntry!.isSold : false,
-        isDraft: false, // 여기서는 "완성본" 기준으로 검증
-        imageUrl: isEditMode ? widget.existingEntry!.imageUrl : null,
-        summary: isEditMode ? widget.existingEntry!.summary : null,
-        interpretation: isEditMode ? widget.existingEntry!.interpretation : null,
       );
 
-      final allDiaries = ref.read(diaryListProvider);
-      final err = _validateSleepOnPost(
-        candidate: tempEntryForValidation,
-        all: allDiaries,
-      );
+      // ✅ "보상 대상인지" 판단
+      final bool wasDraftBefore =
+          isEditMode && (widget.existingEntry?.isDraft == true);
+      final bool isFirstPost = !isEditMode;
+      final bool shouldReward = isFirstPost || wasDraftBefore;
 
-      if (err != null) {
-        if (!mounted) return;
-        _showErrorDialog(err);
-        return;
+      if (isEditMode) {
+        await ref.read(diaryListProvider.notifier).updateDiary(newEntry);
+      } else {
+        await ref.read(diaryListProvider.notifier).addDiary(newEntry);
       }
 
-      // ✅ LLM 로딩 다이얼로그
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(color: Color(0xFFAABCC5)),
-              SizedBox(height: 20),
-              Text(
-                "Re-Analyzing Dream...",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  decoration: TextDecoration.none,
-                ),
-              ),
-            ],
+      // ✅ Cloud Functions 통해 코인 +10 (최초 게시 or draft→게시일 때만)
+      if (shouldReward) {
+        await _rewardDiaryCoins(newEntry.id);
+      }
+
+      if (!mounted) return;
+      Navigator.pop(context); // 로딩 닫기
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isEditMode
+                ? (shouldReward
+                    ? "Diary Updated! (+10 coins for first publish)"
+                    : "Diary Updated!")
+                : "Diary Posted! +10 coins",
           ),
         ),
       );
 
-      try {
-        final llmService = ref.read(llmServiceProvider);
-
-        final results = await Future.wait([
-          llmService.generateImage(text),
-          llmService.analyzeDream(text),
-        ]);
-
-        final imageUrl = results[0] as String;
-        final analysis = results[1] as Map<String, String>;
-
-        final newEntry = DiaryEntry(
-          id: isEditMode ? widget.existingEntry!.id : const Uuid().v4(),
-          date: diaryDate,
-          content: text,
-          imageUrl: imageUrl,
-          summary: analysis['summary'],
-          interpretation: analysis['interpretation'],
-          mood: analysis['mood'] ?? "🌿",
-          sleepDuration: sleepHours,
-          sleepStartAt: sAt,
-          sleepEndAt: eAt,
-          isDraft: false, // 🔥 여기서는 항상 "완성본" 저장
-          isSold: isEditMode ? widget.existingEntry!.isSold : false,
-        );
-
-        // ✅ Firestore 저장
-        if (isEditMode) {
-          await ref.read(diaryListProvider.notifier).updateDiary(newEntry);
-        } else {
-          await ref.read(diaryListProvider.notifier).addDiary(newEntry);
-        }
-
-        // ✅ 코인 지급 규칙
-        // - 새로 작성 + 바로 확정 저장 → +10
-        // - 기존 임시저장(draft) → 이번에 처음으로 확정 저장 → +10
-        // - 이미 확정된 글을 수정(UPDATE) → 0
-        final bool shouldGiveCoins =
-            (!isEditMode && !newEntry.isDraft) ||
-            (isEditMode && wasDraft && !newEntry.isDraft);
-
-        if (shouldGiveCoins) {
-          ref.read(userProvider.notifier).earnCoins(10);
-        }
-
-        if (!mounted) return;
-        Navigator.pop(context); // 로딩 닫기
-
-        // ✅ 스낵바 메시지도 코인 지급 여부에 맞춰서
-        final snackText = isEditMode
-            ? (shouldGiveCoins
-                ? "Diary Posted! +10 coins"
-                : "Diary Updated!")
-            : "Diary Posted! +10 coins";
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(snackText)),
-        );
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => DiaryDetailScreen(entryId: newEntry.id),
-          ),
-        );
-      } on GeminiQuotaExceededException {
-        // 🔔 쿼터 초과 → 로딩 닫고 팝업
-        if (!mounted) return;
-        Navigator.pop(context); // 로딩 닫기
-        await _showQuotaExceededDialog();
-      } catch (e) {
-        if (!mounted) return;
-        Navigator.pop(context); // 로딩 닫기
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to analyze.")),
-        );
-      }
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DiaryDetailScreen(entryId: newEntry.id),
+        ),
+      );
+    } on GeminiQuotaExceededException {
+      // 🔔 쿼터 초과 → 로딩 닫고 팝업
+      if (!mounted) return;
+      Navigator.pop(context); // 로딩 닫기
+      await _showQuotaExceededDialog();
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // 로딩 닫기
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to analyze.")),
+      );
     }
-
+  }
 
   // ───────────────── UI ─────────────────
 
@@ -694,7 +714,8 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                             padding: const EdgeInsets.all(16.0),
                             child: _isSleepUnknown
                                 ? const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 10),
+                                    padding:
+                                        EdgeInsets.symmetric(vertical: 10),
                                     child: Text(
                                       "Sleep duration will not be recorded.",
                                       style: TextStyle(
@@ -837,7 +858,8 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                                 _textScrollController.animateTo(
                                   _textScrollController
                                       .position.maxScrollExtent,
-                                  duration: const Duration(milliseconds: 120),
+                                  duration:
+                                      const Duration(milliseconds: 120),
                                   curve: Curves.easeOut,
                                 );
                               }
@@ -845,7 +867,8 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                           },
                           decoration: const InputDecoration(
                             border: InputBorder.none,
-                            hintText: "Describe what happened in your dream...",
+                            hintText:
+                                "Describe what happened in your dream...",
                             hintStyle: TextStyle(
                               color: Colors.white70,
                               fontStyle: FontStyle.italic,

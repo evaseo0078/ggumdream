@@ -367,3 +367,92 @@ export const createMarketItem = onCall(
     return { id };
   }
 );
+// ====================================================================
+// 5) 일기 작성 보상 코인 지급 (Callable)
+//    - diaryId 기준으로 1회만 보상
+//    - users/{uid}/diaries/{diaryId}.rewardGranted == true 이면 재지급 안 함
+// ====================================================================
+export const rewardDiaryPost = onCall(
+  { region: "asia-northeast3" },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "Login required.");
+    }
+
+    const diaryId: string = (request.data?.diaryId || "").trim();
+    if (!diaryId) {
+      throw new HttpsError("invalid-argument", "diaryId is required.");
+    }
+
+    const userRef = db.collection("users").doc(uid);
+    const diaryRef = userRef.collection("diaries").doc(diaryId);
+
+    const rewardAmount = 10;
+
+    try {
+      await db.runTransaction(async (tx) => {
+        const diarySnap = await tx.get(diaryRef);
+        if (!diarySnap.exists) {
+          throw new HttpsError("not-found", "Diary not found.");
+        }
+
+        const diary = diarySnap.data()!;
+
+        // 아직 보상이 안 된 일기만 지급
+        if (diary.rewardGranted === true) {
+          // 이미 지급된 상태 → 그냥 종료 (에러 아님)
+          return;
+        }
+
+        // isDraft == true 인 상태는 보상 안 함 (임시저장용)
+        if (diary.isDraft === true) {
+          throw new HttpsError(
+            "failed-precondition",
+            "Draft diary cannot be rewarded."
+          );
+        }
+
+        const userSnap = await tx.get(userRef);
+        if (!userSnap.exists) {
+          throw new HttpsError("failed-precondition", "User not found.");
+        }
+
+        const now = FieldValue.serverTimestamp();
+
+        // 코인 증가
+        tx.update(userRef, {
+          coins: FieldValue.increment(rewardAmount),
+          updatedAt: now,
+        });
+
+        // 일기에 rewardGranted 플래그 기록
+        tx.update(diaryRef, {
+          rewardGranted: true,
+          updatedAt: now,
+        });
+
+        // ledger 기록
+        const ledgerRef = userRef.collection("coin_ledger").doc();
+        tx.set(ledgerRef, {
+          amount: rewardAmount,
+          type: "diary_post_reward",
+          refType: "diary",
+          refId: diaryId,
+          createdAt: now,
+        });
+      });
+
+      logger.info("rewardDiaryPost success", { uid, diaryId });
+      return { ok: true };
+    } catch (err: any) {
+      logger.error("rewardDiaryPost error", err);
+      if (err instanceof HttpsError) throw err;
+
+      throw new HttpsError(
+        "internal",
+        "Reward failed: " + (err?.message ?? String(err)),
+      );
+    }
+  },
+);
