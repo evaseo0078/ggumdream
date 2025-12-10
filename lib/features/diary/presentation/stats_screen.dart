@@ -189,8 +189,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                             const SizedBox(height: 12),
                             Row(
                               children: [
-                                _legendDot(const Color.fromARGB(
-                                    255, 94, 82, 82)),
+                                _legendDot(
+                                    const Color.fromARGB(255, 94, 82, 82)),
                                 const SizedBox(width: 6),
                                 const Text("Nightmare (😢, 😡, 😱)"),
                               ],
@@ -216,8 +216,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                             sections: [
                               PieChartSectionData(
                                 value: nightmareCount.toDouble(),
-                                color:
-                                    const Color.fromARGB(255, 94, 82, 82),
+                                color: const Color.fromARGB(255, 94, 82, 82),
                                 title: nightmareCount == 0
                                     ? ''
                                     : '$nightmareCount',
@@ -231,9 +230,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                               PieChartSectionData(
                                 value: normalCount.toDouble(),
                                 color: const Color(0xFFAABCC5),
-                                title: normalCount == 0
-                                    ? ''
-                                    : '$normalCount',
+                                title: normalCount == 0 ? '' : '$normalCount',
                                 radius: 50,
                                 titleStyle: const TextStyle(
                                   fontSize: 16,
@@ -271,8 +268,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                       const SizedBox(height: 4),
                       const Text(
                         "Last 7 days (range view)",
-                        style:
-                            TextStyle(fontSize: 12, color: Colors.grey),
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                       const SizedBox(height: 16),
                       SizedBox(
@@ -460,6 +456,10 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         barTouchData: BarTouchData(
           enabled: true,
           touchTooltipData: BarTouchTooltipData(
+            fitInsideVertically: true,
+            fitInsideHorizontally: true,
+            tooltipPadding: const EdgeInsets.all(8),
+            tooltipMargin: 8,
             getTooltipItem: (group, groupIndex, rod, rodIndex) {
               final d = days[group.x.toInt()];
               final key = _dateOnly(d);
@@ -492,7 +492,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   // -----------------------------------------------------
   // ✅ 캘린더 날짜 기준 수면 구간 집계 (그래프용)
   // -----------------------------------------------------
-  Map<DateTime, List<({double start, double end})>> _sleepIntervalsByCalendarDay(
+  Map<DateTime, List<({double start, double end})>>
+      _sleepIntervalsByCalendarDay(
     List<DiaryEntry> entries,
     List<DateTime> days,
   ) {
