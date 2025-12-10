@@ -1,4 +1,4 @@
-//diary_reository.dart
+// lib/features/diary/data/diary_repository.dart
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -47,6 +47,7 @@ class DiaryRepository {
     return _firestore.collection('users').doc(uid).collection('diaries');
   }
 
+  /// 🔹 현재 로그인 유저 기준으로 일기 실시간 스트림
   Stream<List<DiaryEntry>> watchDiaries() {
     final uid = _auth.currentUser?.uid;
     if (uid == null) {
@@ -68,6 +69,7 @@ class DiaryRepository {
         );
   }
 
+  /// 🔹 현재 로그인 유저 기준으로 일기 1회 조회
   Future<List<DiaryEntry>> fetchDiaries() async {
     final uid = _requireUid();
     final snapshot = await _diaryCollection(uid)
@@ -79,21 +81,44 @@ class DiaryRepository {
         .toList();
   }
 
+  /// 🔹 일기 저장/수정
+  ///  - diaries 규칙:
+  ///    create/update 모두 "ownerId == auth.uid" 조건을 만족해야 하므로
+  ///    항상 ownerId를 현재 로그인 uid로 강제 세팅한다.
   Future<void> saveDiary(DiaryEntry entry) async {
     final uid = _requireUid();
+
+    // DiaryEntry에서 만든 데이터에 ownerId를 강제로 덧붙여서 규칙 만족
+    final data = entry.toFirestore()
+      ..['ownerId'] = uid; // 🔑 rules와 일관성 유지
+
     await _diaryCollection(uid)
         .doc(entry.id)
-        .set(entry.toFirestore(), SetOptions(merge: true));
+        .set(data, SetOptions(merge: true));
   }
 
+  /// 🔹 일기 삭제
   Future<void> deleteDiary(String id) async {
     final uid = _requireUid();
     await _diaryCollection(uid).doc(id).delete();
   }
 
+  /// 🔹 판매 여부 플래그 업데이트
+  ///  - 기존 규칙:
+  ///    resource.data에 ownerId가 있는 경우, update에서도
+  ///    request.resource.data.ownerId == resource.data.ownerId 여야 통과.
+  ///  - 따라서 isSold만 보내면 막힐 수 있으므로
+  ///    항상 ownerId도 함께 보내서 기존 값과 동일하게 유지.
   Future<void> setSellStatus(String id, bool isSold) async {
     final uid = _requireUid();
-    await _diaryCollection(uid).doc(id).update({'isSold': isSold});
+
+    await _diaryCollection(uid).doc(id).set(
+      {
+        'isSold': isSold,
+        'ownerId': uid, // 🔑 update 시에도 ownerId 유지
+      },
+      SetOptions(merge: true),
+    );
   }
 }
 
@@ -191,7 +216,6 @@ JSON format:
         };
       }
 
-
       // ---------------------------
       // 1) 안전하게 값 꺼내기
       // ---------------------------
@@ -216,7 +240,6 @@ JSON format:
         "interpretation": interpretation,
         "mood": moodEmoji,
       };
-
     } catch (e) {
       print("Gemini 분석 오류: $e");
       print("입력값: $content");

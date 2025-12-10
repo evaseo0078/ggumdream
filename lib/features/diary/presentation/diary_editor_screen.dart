@@ -13,6 +13,9 @@ import 'package:ggumdream/shared/widgets/wobbly_painter.dart';
 
 import '../application/diary_providers.dart';
 import '../application/user_provider.dart';
+import '../application/ai_provider.dart'; // 🔥 llmServiceProvider 사용
+import '../../../services/gemini_service.dart' show GeminiQuotaExceededException; // 🔥 쿼터 예외 import
+
 import 'ocr_camera_screen.dart';
 import '../domain/diary_entry.dart';
 import 'diary_detail_screen.dart';
@@ -160,107 +163,110 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     }).toList();
   }
 
- bool _intervalOverlap(
-  DateTime aStart,
-  DateTime aEnd,
-  DateTime bStart,
-  DateTime bEnd,
-) {
-  // 표준 구간 겹침 공식
-  return aStart.isBefore(bEnd) && bStart.isBefore(aEnd);
-}
+  bool _intervalOverlap(
+    DateTime aStart,
+    DateTime aEnd,
+    DateTime bStart,
+    DateTime bEnd,
+  ) {
+    // 표준 구간 겹침 공식
+    return aStart.isBefore(bEnd) && bStart.isBefore(aEnd);
+  }
 
-List<DiaryEntry> _entriesOfSameDreamDayForSleep(
-  DiaryEntry candidate,
-  List<DiaryEntry> all,
-) {
-  // 후보 수면 시작 날짜 기준 "밤 날짜" 계산
-  final candidateDay = candidate.sleepStartAt != null
-      ? DateTime(
-          candidate.sleepStartAt!.year,
-          candidate.sleepStartAt!.month,
-          candidate.sleepStartAt!.day,
-        )
-      : DateTime(
-          candidate.date.year,
-          candidate.date.month,
-          candidate.date.day,
-        );
-
-  return all.where((e) {
-    final eDay = e.sleepStartAt != null
+  List<DiaryEntry> _entriesOfSameDreamDayForSleep(
+    DiaryEntry candidate,
+    List<DiaryEntry> all,
+  ) {
+    // 후보 수면 시작 날짜 기준 "밤 날짜" 계산
+    final candidateDay = candidate.sleepStartAt != null
         ? DateTime(
-            e.sleepStartAt!.year,
-            e.sleepStartAt!.month,
-            e.sleepStartAt!.day,
+            candidate.sleepStartAt!.year,
+            candidate.sleepStartAt!.month,
+            candidate.sleepStartAt!.day,
           )
         : DateTime(
-            e.date.year,
-            e.date.month,
-            e.date.day,
+            candidate.date.year,
+            candidate.date.month,
+            candidate.date.day,
           );
 
-    return _sameDay(candidateDay, eDay);
-  }).toList();
-}
+    return all.where((e) {
+      final eDay = e.sleepStartAt != null
+          ? DateTime(
+              e.sleepStartAt!.year,
+              e.sleepStartAt!.month,
+              e.sleepStartAt!.day,
+            )
+          : DateTime(
+              e.date.year,
+              e.date.month,
+              e.date.day,
+            );
 
-String? _validateSleepOnPost({
-  required DiaryEntry candidate,
-  required List<DiaryEntry> all,
-}) {
-  if (candidate.sleepDuration < 0) return null;
-
-  // 🔥 기존 date 기반이 아니라 sleepStartAt 기반으로 묶기
-  final sameDayEntries = _entriesOfSameDreamDayForSleep(candidate, all)
-      .where((e) => e.id != candidate.id)
-      .toList();
-
-  // 총 수면시간 24시간 초과 체크
-  double existingTotal = 0.0;
-  for (final e in sameDayEntries) {
-    if (e.sleepDuration > 0) {
-      existingTotal += e.sleepDuration;
-    }
+      return _sameDay(candidateDay, eDay);
+    }).toList();
   }
 
-  final newTotal = existingTotal + candidate.sleepDuration;
-  if (newTotal > 24.0 + 1e-6) {
-    final remain = (24.0 - existingTotal).clamp(0.0, 24.0);
-    return "Sleep duration exceeds 24 hours.\n"
-        "Remaining sleep time for today: ${remain.toStringAsFixed(1)}h\n"
-        "Please adjust the time.";
-  }
+  String? _validateSleepOnPost({
+    required DiaryEntry candidate,
+    required List<DiaryEntry> all,
+  }) {
+    if (candidate.sleepDuration < 0) return null;
 
-  // 구간 겹침 체크
-  if (candidate.sleepStartAt != null && candidate.sleepEndAt != null) {
+    // 🔥 기존 date 기반이 아니라 sleepStartAt 기반으로 묶기
+    final sameDayEntries = _entriesOfSameDreamDayForSleep(candidate, all)
+        .where((e) => e.id != candidate.id)
+        .toList();
+
+    // 총 수면시간 24시간 초과 체크
+    double existingTotal = 0.0;
     for (final e in sameDayEntries) {
-      if (e.sleepStartAt == null || e.sleepEndAt == null) continue;
-
-      if (_intervalOverlap(
-        candidate.sleepStartAt!,
-        candidate.sleepEndAt!,
-        e.sleepStartAt!,
-        e.sleepEndAt!,
-      )) {
-        return "This sleep period overlaps with an existing record.\nPlease adjust the time.";
+      if (e.sleepDuration > 0) {
+        existingTotal += e.sleepDuration;
       }
     }
-  }print("------ SLEEP VALIDATION DEBUG ------");
-print("Candidate:");
-print("  start = ${candidate.sleepStartAt}");
-print("  end   = ${candidate.sleepEndAt}");
 
-print("Same day entries (${sameDayEntries.length}):");
-for (final e in sameDayEntries) {
-  print("Entry ${e.id}:");
-  print("  start = ${e.sleepStartAt}");
-  print("  end   = ${e.sleepEndAt}");
-}
-print("-------------------------------------");
+    final newTotal = existingTotal + candidate.sleepDuration;
+    if (newTotal > 24.0 + 1e-6) {
+      final remain = (24.0 - existingTotal).clamp(0.0, 24.0);
+      return "Sleep duration exceeds 24 hours.\n"
+          "Remaining sleep time for today: ${remain.toStringAsFixed(1)}h\n"
+          "Please adjust the time.";
+    }
 
-  return null;
-}
+    // 구간 겹침 체크
+    if (candidate.sleepStartAt != null && candidate.sleepEndAt != null) {
+      for (final e in sameDayEntries) {
+        if (e.sleepStartAt == null || e.sleepEndAt == null) continue;
 
+        if (_intervalOverlap(
+          candidate.sleepStartAt!,
+          candidate.sleepEndAt!,
+          e.sleepStartAt!,
+          e.sleepEndAt!,
+        )) {
+          return "This sleep period overlaps with an existing record.\nPlease adjust the time.";
+        }
+      }
+    }
+
+    if (kDebugMode) {
+      print("------ SLEEP VALIDATION DEBUG ------");
+      print("Candidate:");
+      print("  start = ${candidate.sleepStartAt}");
+      print("  end   = ${candidate.sleepEndAt}");
+
+      print("Same day entries (${sameDayEntries.length}):");
+      for (final e in sameDayEntries) {
+        print("Entry ${e.id}:");
+        print("  start = ${e.sleepStartAt}");
+        print("  end   = ${e.sleepEndAt}");
+      }
+      print("-------------------------------------");
+    }
+
+    return null;
+  }
 
   // ───────────────── 저장 로직 ─────────────────
 
@@ -315,6 +321,47 @@ print("-------------------------------------");
     Navigator.pop(context);
   }
 
+  /// 🔔 LLM 쿼터 초과 팝업
+  Future<void> _showQuotaExceededDialog() {
+    return showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          backgroundColor: Colors.white,
+          title: const Text(
+            "AI 분석 호출 한도 초과",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
+          content: const Text(
+            "AI 분석에 필요한 호출 한도를 초과했습니다.\n\n"
+            "잠시 후 다시 시도해 주세요.\n"
+            "문제가 계속되면 서비스 담당자에게 문의해 주세요.",
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.4,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                "확인",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _processAndSave() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
@@ -366,10 +413,10 @@ print("-------------------------------------");
         _validateSleepOnPost(candidate: tempEntryForValidation, all: allDiaries);
 
     if (err != null) {
-  if (!mounted) return;
-  _showErrorDialog(err);
-  return;
-}
+      if (!mounted) return;
+      _showErrorDialog(err);
+      return;
+    }
 
     // ✅ LLM 로딩
     showDialog(
@@ -432,7 +479,8 @@ print("-------------------------------------");
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(isEditMode ? "Diary Updated!" : "Diary Posted! +10 coins"),
+          content:
+              Text(isEditMode ? "Diary Updated!" : "Diary Posted! +10 coins"),
         ),
       );
 
@@ -442,6 +490,11 @@ print("-------------------------------------");
           builder: (context) => DiaryDetailScreen(entryId: newEntry.id),
         ),
       );
+    } on GeminiQuotaExceededException {
+      // 🔔 쿼터 초과 → 로딩 닫고 팝업
+      if (!mounted) return;
+      Navigator.pop(context); // 로딩 닫기
+      await _showQuotaExceededDialog();
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context); // 로딩 닫기
@@ -784,39 +837,39 @@ print("-------------------------------------");
       ),
     );
   }
+
   void _showErrorDialog(String message) {
-  showDialog(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        backgroundColor: Colors.white,
-        title: const Text(
-          "⚠ Notion",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-        content: Text(
-          message,
-          style: const TextStyle(
-            fontSize: 15,
-            height: 1.4,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              "OK",
-              style: TextStyle(fontWeight: FontWeight.bold),
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: Colors.white,
+          title: const Text(
+            "⚠ Notice",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
             ),
           ),
-        ],
-      );
-    },
-  );
-}
-
+          content: Text(
+            message,
+            style: const TextStyle(
+              fontSize: 15,
+              height: 1.4,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                "OK",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }

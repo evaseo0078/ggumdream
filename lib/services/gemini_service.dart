@@ -1,8 +1,18 @@
+// gemini_service.dart
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:typed_data';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+
+/// 🔥 Gemini 쿼터 초과 시 던지는 예외
+class GeminiQuotaExceededException implements Exception {
+  final String message;
+  GeminiQuotaExceededException([this.message = '']);
+
+  @override
+  String toString() => 'GeminiQuotaExceededException: $message';
+}
 
 class GeminiService {
   // .env load check
@@ -25,10 +35,12 @@ class GeminiService {
 
   Future<String?> analyzeDreamSketch(Uint8List imageBytes) async {
     final key = _apiKey;
-    if (key.isEmpty) return "Configuration error: Missing API key (see logs).";
+    if (key.isEmpty) {
+      return "Configuration error: Missing API key (see logs).";
+    }
 
     log('📸 Image size: ${imageBytes.lengthInBytes} bytes');
-    String base64Image = base64Encode(imageBytes);
+    final base64Image = base64Encode(imageBytes);
 
     try {
       final url = Uri.parse('$_baseUrl?key=$key');
@@ -43,17 +55,19 @@ class GeminiService {
                     "This image is a sketch of the user's dream. Describe the scene briefly and gently interpret its symbolic meaning from a dream analysis perspective. Keep the response to a single paragraph under 60 words (approx. 300–400 characters). Be concise and focus only on the essentials."
               },
               {
-                "inline_data": {"mime_type": "image/png", "data": base64Image}
+                "inline_data": {
+                  "mime_type": "image/png",
+                  "data": base64Image,
+                }
               }
             ]
           }
         ],
         "generationConfig": {
           "temperature": 0.4,
-          // Provide ample headroom; client-side truncation ensures brevity
           "maxOutputTokens": 1024,
           "topK": 40,
-          "topP": 0.8
+          "topP": 0.8,
         }
       });
 
@@ -66,7 +80,11 @@ class GeminiService {
       );
 
       log('📡 Status code: ${response.statusCode}');
+      log('📡 Response body: ${response.body}');
 
+      // ----------------------------
+      // 200 OK: 정상 처리
+      // ----------------------------
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
@@ -86,30 +104,55 @@ class GeminiService {
           if (candidate['finishReason'] != null) {
             final reason = candidate['finishReason'];
             if (reason == 'MAX_TOKENS') {
-              // If there is partial text, return truncated; else fallback
               if (candidate['content'] != null &&
                   candidate['content']['parts'] != null) {
-                final partial = candidate['content']['parts'][0]['text'] ?? '';
+                final partial =
+                    candidate['content']['parts'][0]['text'] ?? '';
                 final clipped = _truncateToRange(partial);
                 return clipped.isNotEmpty ? clipped : _fallbackSummary();
               }
               return _fallbackSummary();
             }
-            // For other finish reasons, avoid surfacing errors
+            // other finish reasons → generic fallback
             return _fallbackSummary();
           }
         }
-        return _fallbackSummary();
-      } else {
-        // Log error body
-        log('❌ [ERROR BODY]: ${response.body}');
 
-        // Do not surface errors to user; provide a friendly fallback instead
         return _fallbackSummary();
       }
+
+      // ----------------------------
+      // 200이 아닌 모든 응답 처리
+      // 여기서 "쿼터 초과"를 캐치해서 예외로 던짐
+      // ----------------------------
+      log('❌ [ERROR BODY]: ${response.body}');
+
+      String? errorMessage;
+      try {
+        final err = jsonDecode(response.body);
+        errorMessage = err['error']?['message']?.toString();
+      } catch (_) {
+        // ignore JSON parse error
+      }
+
+      final msgLower = (errorMessage ?? '').toLowerCase();
+
+      final isQuotaError =
+          response.statusCode == 429 || // Too Many Requests
+          msgLower.contains('quota') ||
+          msgLower.contains('rate limit') ||
+          msgLower.contains('resource_exhausted');
+
+      if (isQuotaError) {
+        // 👉 UI에서 팝업을 띄울 수 있도록 예외 전달
+        throw GeminiQuotaExceededException(errorMessage ?? 'Quota exceeded');
+      }
+
+      // 그 외 에러는 조용히 fallback 제공
+      return _fallbackSummary();
     } catch (e) {
-      log('💥 Network exception: $e');
-      // Always return a friendly fallback to avoid error surfacing
+      // 네트워크/기타 예외
+      log('💥 Network exception in analyzeDreamSketch: $e');
       return _fallbackSummary();
     }
   }
@@ -119,8 +162,11 @@ class GeminiService {
   }
 
   // Helper to clamp output to ~300–400 chars
-  String _truncateToRange(String input,
-      {int minChars = 280, int maxChars = 420}) {
+  String _truncateToRange(
+    String input, {
+    int minChars = 280,
+    int maxChars = 420,
+  }) {
     final trimmed = input.trim().replaceAll('\n', ' ');
     if (trimmed.length <= maxChars) {
       return trimmed;
@@ -131,9 +177,11 @@ class GeminiService {
     final boundary = [lastPeriod, lastKoreanPeriod]
         .where((i) => i >= minChars)
         .fold(-1, (a, b) => a > b ? a : b);
+
     if (boundary >= minChars) {
       return cut.substring(0, boundary + 1).trim();
     }
+
     final lastSpace = cut.lastIndexOf(' ');
     if (lastSpace >= minChars) {
       return cut.substring(0, lastSpace).trim() + '…';

@@ -143,6 +143,19 @@ class UserNotifier extends StateNotifier<UserState> {
     );
   }
 
+  /// 🔹 이제 이 함수는 "로컬 잔액 표시" 용도로만 사용
+  ///    실제 코인 증감(지급/차감)은 Cloud Functions(서버)에서 처리해야 함.
+  Future<void> earnCoins(int amount) async {
+    if (amount <= 0) return;
+
+    // ⚠️ 주의:
+    // - Firestore 보안 규칙에서 coins 필드는 클라이언트가 변경할 수 없도록 막혀 있음.
+    // - 따라서 여기서는 Firestore에 coins를 쓰지 않고,
+    //   화면에서 보여줄 로컬 state만 변경한다.
+    final newBalance = state.coins + amount;
+    state = state.copyWith(coins: newBalance);
+  }
+
   /// 🔹 이제 이 함수는 "로컬 잔액 충분한지 미리 체크" 용도로만 사용
   Future<bool> spendCoins(int amount) async {
     if (amount <= 0) return true;
@@ -151,19 +164,6 @@ class UserNotifier extends StateNotifier<UserState> {
     // 실제 코인 차감은 Cloud Functions(purchaseMarketItem)에서 처리
     // 여기서는 true/false만 리턴해서 구매 버튼 제어용으로 사용
     return true;
-  }
-
-  /// 테스트용/기타 용도로 남겨두지만,
-  /// 실제 프로덕션에서는 Cloud Functions로 통일하는 것이 좋음.
-  Future<void> earnCoins(int amount) async {
-    if (amount <= 0) return;
-
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return;
-
-    final newBalance = state.coins + amount;
-    await _users.doc(uid).set({'coins': newBalance}, SetOptions(merge: true));
-    // 문서가 변경되면 snapshots().listen 이 알아서 state를 업데이트함.
   }
 
   // 아래 purchaseItem / recordSale / cancelSale / updateSalePrice 는
