@@ -40,6 +40,7 @@ class DiaryEditorScreen extends ConsumerStatefulWidget {
 
 class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
   late TextEditingController _textController;
+  late ScrollController _textScrollController;
 
   bool _isSleepUnknown = false;
 
@@ -59,6 +60,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
     // 내용
     final initialText = e?.content ?? widget.initialContent ?? "";
     _textController = TextEditingController(text: initialText);
+    _textScrollController = ScrollController();
 
     // 수면 unknown 여부
     if (e != null && e.sleepDuration < 0) {
@@ -82,6 +84,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
   @override
   void dispose() {
     _textController.dispose();
+    _textScrollController.dispose();
     super.dispose();
   }
 
@@ -797,6 +800,7 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                         padding: const EdgeInsets.all(16),
                         child: TextField(
                           controller: _textController,
+                          scrollController: _textScrollController,
                           maxLines: null,
                           expands: true,
                           style: const TextStyle(
@@ -804,6 +808,19 @@ class _DiaryEditorScreenState extends ConsumerState<DiaryEditorScreen> {
                             height: 1.5,
                             color: Color.fromARGB(255, 46, 46, 46),
                           ),
+                          onChanged: (_) {
+                            // 줄바꿈 후 현재 줄이 보이도록 끝으로 스크롤
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (_textScrollController.hasClients) {
+                                _textScrollController.animateTo(
+                                  _textScrollController
+                                      .position.maxScrollExtent,
+                                  duration: const Duration(milliseconds: 120),
+                                  curve: Curves.easeOut,
+                                );
+                              }
+                            });
+                          },
                           decoration: const InputDecoration(
                             border: InputBorder.none,
                             hintText: "Describe what happened in your dream...",

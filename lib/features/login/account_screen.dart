@@ -175,8 +175,7 @@ class AccountScreen extends ConsumerWidget {
                                   .withOpacity(0.7),
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color:
-                                    const Color.fromARGB(255, 192, 171, 255),
+                                color: const Color.fromARGB(255, 192, 171, 255),
                                 width: 1.2,
                               ),
                             ),
@@ -333,13 +332,11 @@ class AccountScreen extends ConsumerWidget {
                         children: [
                           if (myPurchasedItems.isNotEmpty)
                             ...myPurchasedItems.map(
-                              (item) =>
-                                  _buildPurchaseItem(context, ref, item),
+                              (item) => _buildPurchaseItem(context, ref, item),
                             ),
                           if (userState.purchaseHistory.isNotEmpty)
                             ...userState.purchaseHistory.map(
-                              (item) =>
-                                  _buildPurchaseItem(context, ref, item),
+                              (item) => _buildPurchaseItem(context, ref, item),
                             ),
                         ],
                       ),
@@ -372,8 +369,7 @@ class AccountScreen extends ConsumerWidget {
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: mySellingItems
-                            .map((item) =>
-                                _buildSellingItem(context, item))
+                            .map((item) => _buildSellingItem(context, item))
                             .toList(),
                       ),
               ),
@@ -417,9 +413,7 @@ class AccountScreen extends ConsumerWidget {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () async {
-                    await ref
-                        .read(authStateProvider.notifier)
-                        .logout();
+                    await ref.read(authStateProvider.notifier).logout();
 
                     ref.invalidate(userProvider);
                     ref.invalidate(shopProvider);
@@ -429,8 +423,7 @@ class AccountScreen extends ConsumerWidget {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        const Color.fromARGB(255, 192, 171, 255),
+                    backgroundColor: const Color.fromARGB(255, 192, 171, 255),
                     foregroundColor: Colors.white,
                   ),
                   child: const Text('Logout'),
@@ -476,8 +469,7 @@ class AccountScreen extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            const Icon(Icons.shopping_bag,
-                size: 16, color: Colors.green),
+            const Icon(Icons.shopping_bag, size: 16, color: Colors.green),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
@@ -553,7 +545,7 @@ class AccountScreen extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    "판매 중",
+                    "Cureently Selling",
                     style: TextStyle(
                       fontSize: 10,
                       color: Colors.orange[700],
@@ -588,8 +580,7 @@ class AccountScreen extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.check_circle,
-              size: 16, color: Colors.grey),
+          const Icon(Icons.check_circle, size: 16, color: Colors.grey),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -605,7 +596,7 @@ class AccountScreen extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  "판매 완료",
+                  "Sold out",
                   style: TextStyle(
                     fontSize: 10,
                     color: Colors.grey[600],
